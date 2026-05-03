@@ -54,6 +54,9 @@ const clearInput       = $('clear-input');
 const translateBtn     = $('translate-btn');
 const outFormat        = $('out-format');
 const outTone          = $('out-tone');
+const toneCombo        = $('tone-combo');
+const toneMenuBtn      = $('tone-menu-btn');
+const toneMenu         = $('tone-menu');
 const outLang          = $('out-lang');
 const outputPlaceholder= $('output-placeholder');
 const outputText       = $('output-text');
@@ -90,6 +93,7 @@ function init() {
   loadPersistedSettings();
   bindModeToggle();
   bindSettingsPanel();
+  bindToneMenu();
   bindSplitInput();
   bindSplitTranslate();
   bindSpeakButton();
@@ -223,6 +227,37 @@ function resolveToneInput(value) {
   const tone = TONE_INPUT_VALUES[raw];
   if (tone) return { tone, customStyle: '' };
   return { tone: 'neutral', customStyle: raw };
+}
+
+function bindToneMenu() {
+  if (!toneMenuBtn || !toneMenu || !toneCombo) return;
+
+  toneMenuBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleToneMenu(toneMenu.hidden);
+  });
+
+  toneMenu.addEventListener('click', e => {
+    const preset = e.target.closest('[data-tone-preset]');
+    if (!preset) return;
+    outTone.value = preset.dataset.tonePreset;
+    toggleToneMenu(false);
+    outTone.focus();
+  });
+
+  outTone.addEventListener('focus', () => toggleToneMenu(true));
+  outTone.addEventListener('keydown', e => {
+    if (e.key === 'Escape') toggleToneMenu(false);
+  });
+
+  document.addEventListener('click', e => {
+    if (!toneCombo.contains(e.target)) toggleToneMenu(false);
+  });
+}
+
+function toggleToneMenu(open) {
+  toneMenu.hidden = !open;
+  toneMenuBtn.setAttribute('aria-expanded', String(open));
 }
 
 function openSettingsPanel() {

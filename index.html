@@ -138,23 +138,29 @@
           <option value="audio">음성 생성</option>
           <option value="video">동영상 생성</option>
         </select>
-        <input
-          type="text"
-          id="out-tone"
-          class="ctrl-input ctrl-tone"
-          list="tone-presets"
-          placeholder="말투 선택 또는 직접 입력"
-          autocomplete="off"
-          aria-label="말투"
-        >
-        <datalist id="tone-presets">
-          <option value="중립"></option>
-          <option value="격식체"></option>
-          <option value="구어체"></option>
-          <option value="오은영 박사 말투"></option>
-          <option value="힙합 가사체"></option>
-          <option value="ISTP 말투"></option>
-        </datalist>
+        <div class="tone-combo" id="tone-combo">
+          <input
+            type="text"
+            id="out-tone"
+            class="ctrl-input ctrl-tone"
+            placeholder="말투 선택 또는 직접 입력"
+            autocomplete="off"
+            aria-label="말투"
+          >
+          <button class="tone-menu-btn" id="tone-menu-btn" type="button" aria-label="추천 말투 보기" aria-expanded="false">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="tone-menu" id="tone-menu" hidden>
+            <button type="button" data-tone-preset="중립">중립</button>
+            <button type="button" data-tone-preset="격식체">격식체</button>
+            <button type="button" data-tone-preset="구어체">구어체</button>
+            <button type="button" data-tone-preset="오은영 박사 말투">오은영 박사 말투</button>
+            <button type="button" data-tone-preset="힙합 가사체">힙합 가사체</button>
+            <button type="button" data-tone-preset="ISTP 말투">ISTP 말투</button>
+          </div>
+        </div>
         <select id="out-lang" class="ctrl-select" aria-label="출력 언어">
           <option value="ko">한국어</option>
           <option value="en">English</option>
