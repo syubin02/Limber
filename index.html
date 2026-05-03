@@ -113,6 +113,7 @@
           <option value="rewrite">재작성</option>
           <option value="image">이미지 생성</option>
           <option value="audio">음성 생성</option>
+          <option value="video">동영상 생성</option>
         </select>
         <select id="out-tone" class="ctrl-select" aria-label="말투" id="out-tone-wrap">
           <option value="neutral">중립</option>
@@ -145,6 +146,20 @@
               <span class="audio-generating-label">음성 생성 중...</span>
             </div>
             <audio id="audio-player" controls preload="auto" hidden></audio>
+          </div>
+        </div>
+        <div class="output-video-wrap" id="output-video-wrap" hidden>
+          <video id="output-video" controls playsinline></video>
+          <p class="output-image-prompt" id="output-video-prompt"></p>
+        </div>
+        <div class="video-loading" id="video-loading" hidden aria-live="polite">
+          <div class="image-loading-inner">
+            <div class="video-dots">
+              <span></span><span></span><span></span>
+            </div>
+            <p class="image-loading-title">동영상 생성 중</p>
+            <p class="image-loading-sub">minimax/video-01 모델이 작업 중입니다<br>보통 2–5분 소요됩니다</p>
+            <p class="video-elapsed" id="video-elapsed">0:00 경과</p>
           </div>
         </div>
         <div class="image-loading" id="image-loading" hidden aria-live="polite">
@@ -222,6 +237,16 @@
         </div>
         <p class="settings-hint">API 키는 이 브라우저에만 로컬 저장됩니다.</p>
         <p class="api-status" id="api-status"></p>
+      </div>
+
+      <div class="settings-section">
+        <label class="settings-label" for="replicate-key-input">Replicate API Key <span class="settings-tag">동영상 생성</span></label>
+        <div class="api-key-row">
+          <input type="password" id="replicate-key-input" class="settings-input" placeholder="r8_..." autocomplete="off">
+          <button class="save-btn" id="save-replicate-key">저장</button>
+        </div>
+        <p class="settings-hint">replicate.com에서 발급. 동영상 생성 포맷에만 사용됩니다.</p>
+        <p class="api-status" id="replicate-status"></p>
       </div>
 
       <div class="settings-section">

@@ -475,6 +475,77 @@ audio#audio-player {
   color: var(--primary);
 }
 
+/* Settings tag badge */
+.settings-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--primary);
+  background: var(--primary-dim);
+  padding: 2px 6px;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+/* Video output */
+.output-video-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: fadeUp 250ms var(--ease) both;
+}
+
+.output-video-wrap video {
+  width: 100%;
+  border-radius: var(--radius-md);
+  display: block;
+  background: #000;
+  max-height: 360px;
+}
+
+/* Video generating loading state */
+.video-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed rgba(255, 97, 0, 0.25);
+  background: rgba(255, 97, 0, 0.04);
+  animation: fadeUp 200ms var(--ease) both;
+}
+
+.video-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.video-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: bounceDot 1.4s ease-in-out infinite;
+}
+
+.video-dots span:nth-child(1) { animation-delay: 0s; }
+.video-dots span:nth-child(2) { animation-delay: 0.2s; }
+.video-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounceDot {
+  0%, 80%, 100% { transform: scale(0.5); opacity: 0.4; }
+  40%           { transform: scale(1);   opacity: 1; }
+}
+
+.video-elapsed {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Image generating loading state */
 .image-loading {
   display: flex;

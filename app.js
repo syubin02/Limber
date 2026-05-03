@@ -43,6 +43,11 @@ const outputImageWrap = $('output-image-wrap');
 const outputImageEl   = $('output-image');
 const outputImagePrompt=$('output-image-prompt');
 const imageLoading    = $('image-loading');
+const outputVideoWrap = $('output-video-wrap');
+const outputVideoEl   = $('output-video');
+const outputVideoPrompt=$('output-video-prompt');
+const videoLoading    = $('video-loading');
+const videoElapsed    = $('video-elapsed');
 const outputAudioWrap = $('output-audio-wrap');
 const outputAudioText = $('output-audio-text');
 const audioGenerating = $('audio-generating');
@@ -126,6 +131,24 @@ function bindSettingsPanel() {
     localStorage.setItem('limber_api_key', key);
     setApiStatus('저장되었습니다', 'ok');
     showToast('API 키 저장 완료');
+  });
+
+  const replicateKeyInput  = $('replicate-key-input');
+  const saveReplicateKey   = $('save-replicate-key');
+  const replicateStatusEl  = $('replicate-status');
+  const storedReplicate    = localStorage.getItem('limber_replicate_key');
+  if (storedReplicate) {
+    replicateKeyInput.value = storedReplicate;
+    replicateStatusEl.textContent = 'Replicate 키 저장됨';
+    replicateStatusEl.className   = 'api-status ok';
+  }
+  saveReplicateKey.addEventListener('click', () => {
+    const key = replicateKeyInput.value.trim();
+    if (!key) { replicateStatusEl.textContent = '키를 입력해주세요'; replicateStatusEl.className = 'api-status err'; return; }
+    localStorage.setItem('limber_replicate_key', key);
+    replicateStatusEl.textContent = '저장되었습니다';
+    replicateStatusEl.className   = 'api-status ok';
+    showToast('Replicate 키 저장 완료');
   });
 
   defaultFormat.addEventListener('change', () => {
@@ -235,6 +258,8 @@ function bindSplitTranslate() {
         showSplitImage(result);
       } else if (fmt === 'audio') {
         showSplitAudio(result);
+      } else if (fmt === 'video') {
+        await showSplitVideo(result);
       } else {
         splitOutputText = result;
         showSplitOutput(result);
@@ -268,9 +293,12 @@ function setSplitLoading(on) {
     outputText.hidden      = true;
     outputImageWrap.hidden = true;
     outputAudioWrap.hidden = true;
+    outputVideoWrap.hidden = true;
     imageLoading.hidden    = true;
+    videoLoading.hidden    = true;
     speakBtn.disabled      = true;
     stopSpeaking();
+    stopVideoTimer();
   }
 }
 
@@ -387,6 +415,93 @@ function showSplitAudio(text) {
   audioPlayer.load();
 }
 
+// ===== VIDEO GENERATION (Replicate) =====
+let videoTimerId = null;
+
+function startVideoTimer() {
+  const start = Date.now();
+  videoElapsed.textContent = '0:00 경과';
+  videoTimerId = setInterval(() => {
+    const s = Math.floor((Date.now() - start) / 1000);
+    videoElapsed.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} 경과`;
+  }, 1000);
+}
+
+function stopVideoTimer() {
+  clearInterval(videoTimerId);
+  videoTimerId = null;
+}
+
+async function showSplitVideo(prompt) {
+  const replicateKey = localStorage.getItem('limber_replicate_key');
+  if (!replicateKey) {
+    openSettingsPanel();
+    showToast('Replicate API 키를 먼저 입력해주세요');
+    setSplitLoading(false);
+    outputPlaceholder.hidden = false;
+    return;
+  }
+
+  // Switch from text skeleton to video loading UI
+  skeletonWrap.hidden      = true;
+  outputPlaceholder.hidden = true;
+  outputVideoWrap.hidden   = true;
+  videoLoading.hidden      = false;
+  translateBtn.disabled    = true;
+  startVideoTimer();
+
+  try {
+    const videoUrl = await generateVideoWithReplicate(prompt, replicateKey);
+    stopVideoTimer();
+    outputVideoPrompt.textContent = prompt;
+    outputVideoEl.src             = videoUrl;
+    videoLoading.hidden           = true;
+    outputVideoWrap.hidden        = false;
+    translateBtn.disabled         = false;
+  } catch (err) {
+    stopVideoTimer();
+    videoLoading.hidden      = true;
+    outputPlaceholder.hidden = false;
+    translateBtn.disabled    = false;
+    showToast('동영상 생성 오류: ' + (err.message || ''));
+  }
+}
+
+async function generateVideoWithReplicate(prompt, key) {
+  const createRes = await fetch('https://api.replicate.com/v1/models/minimax/video-01/predictions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input: { prompt, prompt_optimizer: true } })
+  });
+
+  if (!createRes.ok) {
+    const body = await createRes.json().catch(() => ({}));
+    throw new Error(body.detail || `HTTP ${createRes.status}`);
+  }
+
+  const prediction = await createRes.json();
+  const pollUrl    = prediction.urls?.get ||
+    `https://api.replicate.com/v1/predictions/${prediction.id}`;
+
+  // Poll every 4 seconds, max 10 minutes
+  const deadline = Date.now() + 10 * 60 * 1000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 4000));
+    const res    = await fetch(pollUrl, { headers: { 'Authorization': 'Bearer ' + key } });
+    const result = await res.json();
+
+    if (result.status === 'succeeded') {
+      const out = Array.isArray(result.output) ? result.output[0] : result.output;
+      if (!out) throw new Error('출력이 없습니다');
+      return out;
+    }
+    if (result.status === 'failed') {
+      throw new Error(result.error || '생성 실패');
+    }
+  }
+  throw new Error('시간 초과 (10분)');
+}
+
 function buildPollinationsUrl(prompt) {
   const seed = Math.floor(Math.random() * 99999);
   return 'https://image.pollinations.ai/prompt/' +
@@ -459,7 +574,8 @@ function buildSystemPrompt(format, tone, lang) {
     bullets:   `주어진 텍스트(또는 이미지의 텍스트)의 핵심 내용을 ${langName}로 불릿 포인트(•) 목록으로 정리해줘. ${toneName}를 사용해.`,
     rewrite:   `주어진 텍스트를 ${langName}로, ${toneName}로 다시 작성해줘. 의미는 유지하되 표현을 바꿔줘.`,
     image:     `사용자가 입력한 내용을 분석하여, FLUX 이미지 생성 모델에 최적화된 영어 프롬프트를 작성해줘. 시각적으로 구체적이고 풍부한 묘사를 포함해야 해. 프롬프트 텍스트만 출력해. 다른 설명, 따옴표, 머릿말은 절대 쓰지 마. 예시 형식: "a serene mountain lake at sunrise, golden light reflecting on calm water, misty pine forest, photorealistic, cinematic"`,
-    audio:     `주어진 텍스트(또는 이미지의 텍스트)를 ${langName}로 번역하거나 처리해줘. ${toneName}를 사용해. 음성으로 읽기 좋게 자연스러운 문장으로 작성해. 텍스트만 출력해.`
+    audio:     `주어진 텍스트(또는 이미지의 텍스트)를 ${langName}로 번역하거나 처리해줘. ${toneName}를 사용해. 음성으로 읽기 좋게 자연스러운 문장으로 작성해. 텍스트만 출력해.`,
+    video:     `사용자가 입력한 내용을 분석하여, minimax video-01 동영상 생성 모델에 최적화된 영어 프롬프트를 작성해줘. 동적인 카메라 움직임, 조명, 분위기를 구체적으로 묘사해야 해. 프롬프트 텍스트만 출력해. 다른 설명, 따옴표, 머릿말은 절대 쓰지 마. 예시: "A camera slowly pans across a sunlit mountain valley, golden hour light, cinematic depth of field, birds flying in the distance"`
   };
 
   return prompts[format] || prompts.translate;
@@ -544,7 +660,7 @@ function spawnNode(parentId, x, y, inheritInput) {
   return id;
 }
 
-const FORMAT_LABELS = { translate: '번역', explain: '설명', summarize: '요약', bullets: '불릿', rewrite: '재작성', image: '이미지', audio: '음성' };
+const FORMAT_LABELS = { translate: '번역', explain: '설명', summarize: '요약', bullets: '불릿', rewrite: '재작성', image: '이미지', audio: '음성', video: '동영상' };
 
 function renderNodeCard(data) {
   const { id, x, y, input, format, tone, lang, output } = data;
@@ -575,6 +691,7 @@ function renderNodeCard(data) {
           <option value="rewrite"   ${format==='rewrite'  ?'selected':''}>재작성</option>
           <option value="image"     ${format==='image'    ?'selected':''}>이미지</option>
           <option value="audio"     ${format==='audio'    ?'selected':''}>음성</option>
+          <option value="video"     ${format==='video'    ?'selected':''}>동영상</option>
         </select>
         <select class="node-select" data-sel="${id}" data-field="tone">
           <option value="neutral" ${tone==='neutral'?'selected':''}>중립</option>
@@ -739,6 +856,20 @@ async function runNodeTranslate(id) {
         '?model=openai-audio&voice=' + voice;
       outEl.innerHTML = `<p style="font-size:12px;line-height:1.6;margin-bottom:8px">${escHtml(result)}</p>
         <audio controls preload="auto" style="width:100%;height:32px;border-radius:6px;accent-color:var(--primary)" src="${audioUrl}"></audio>`;
+    } else if (d.format === 'video') {
+      outEl.className   = 'node-output';
+      outEl.textContent = '동영상 생성 중... (2–5분 소요)';
+      const replicateKey = localStorage.getItem('limber_replicate_key');
+      if (!replicateKey) {
+        outEl.textContent = 'Replicate API 키가 필요합니다. 설정에서 입력해주세요.';
+      } else {
+        generateVideoWithReplicate(result, replicateKey)
+          .then(url => {
+            outEl.innerHTML = `<video controls playsinline src="${url}"
+              style="width:100%;border-radius:6px;display:block;max-height:200px;background:#000"></video>`;
+          })
+          .catch(err => { outEl.textContent = '오류: ' + (err.message || ''); });
+      }
     } else {
       outEl.textContent = result;
       outEl.className = 'node-output';
