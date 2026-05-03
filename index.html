@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>l!mber — Generative Translator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-left">
+      <span class="logo">l<em>!</em>mber</span>
+    </div>
+    <div class="mode-toggle" role="group" aria-label="보기 모드">
+      <button class="mode-btn active" id="split-btn">Split</button>
+      <button class="mode-btn" id="node-btn">Node</button>
+    </div>
+    <div class="header-right">
+      <button class="icon-btn" id="settings-btn" title="설정">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ======================== SPLIT VIEW ======================== -->
+  <main id="split-view" class="split-view">
+
+    <section class="panel input-panel" aria-label="입력">
+      <div class="panel-header">
+        <span class="panel-label">Input</span>
+        <button class="icon-btn" id="clear-input" title="지우기">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M11 3L3 11M3 3l8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="input-body" id="input-body">
+        <textarea
+          id="input-text"
+          placeholder="번역할 텍스트를 입력하거나&#10;이미지를 드래그하세요"
+          spellcheck="false"
+          aria-label="입력 텍스트"
+        ></textarea>
+
+        <div class="image-preview-wrap" id="image-preview-wrap" hidden>
+          <img id="image-preview" src="" alt="첨부 이미지 미리보기">
+          <button class="remove-image-btn" id="remove-image" title="이미지 제거">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M9 3L3 9M3 3l6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="drop-overlay" id="drop-overlay" aria-hidden="true">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+            <path d="M18 6v16M10 14l8-8 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 26h24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <p>이미지를 놓으세요</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="split-divider" aria-hidden="true">
+      <button class="translate-btn" id="translate-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Translate</span>
+      </button>
+    </div>
+
+    <section class="panel output-panel" aria-label="출력">
+      <div class="panel-header">
+        <span class="panel-label">Output</span>
+        <div class="output-actions">
+          <button class="icon-btn" id="copy-output" title="복사">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M10 4V2.5A.5.5 0 009.5 2h-7a.5.5 0 00-.5.5v7a.5.5 0 00.5.5H4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="download-output" title="다운로드">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M7 2v7M4 7l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 11h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="output-controls">
+        <select id="out-format" class="ctrl-select" aria-label="출력 형식">
+          <option value="translate">번역</option>
+          <option value="explain">설명/해석</option>
+          <option value="summarize">요약</option>
+          <option value="bullets">불릿포인트</option>
+          <option value="rewrite">재작성</option>
+        </select>
+        <select id="out-tone" class="ctrl-select" aria-label="말투">
+          <option value="neutral">중립</option>
+          <option value="formal">격식체</option>
+          <option value="casual">구어체</option>
+        </select>
+        <select id="out-lang" class="ctrl-select" aria-label="출력 언어">
+          <option value="ko">한국어</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+          <option value="zh">中文</option>
+          <option value="es">Español</option>
+        </select>
+      </div>
+
+      <div class="output-body">
+        <p class="output-placeholder" id="output-placeholder">번역 결과가 여기에 표시됩니다</p>
+        <div class="output-text" id="output-text" hidden></div>
+        <div class="skeleton-wrap" id="skeleton-wrap" hidden aria-label="로딩 중" aria-live="polite">
+          <div class="skeleton long"></div>
+          <div class="skeleton medium"></div>
+          <div class="skeleton long"></div>
+          <div class="skeleton short"></div>
+          <div class="skeleton medium"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ======================== NODE VIEW ======================== -->
+  <main id="node-view" class="node-view" hidden aria-label="노드 캔버스">
+    <div class="canvas-toolbar">
+      <button class="toolbar-btn" id="add-root-node">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        새 노드
+      </button>
+      <button class="toolbar-btn" id="reset-view-btn">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M2 7a5 5 0 105-5 5 5 0 00-4.9 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M2 3.5V7h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        보기 초기화
+      </button>
+    </div>
+
+    <div class="node-empty-state" id="node-empty-state">
+      <p class="node-empty-title">새 노드 추가</p>
+      <p class="node-empty-sub">상단의 버튼을 클릭하거나 캔버스를 클릭해 시작하세요</p>
+    </div>
+
+    <svg id="connections-svg" class="connections-svg" aria-hidden="true"></svg>
+    <div id="node-canvas" class="node-canvas"></div>
+
+    <div class="canvas-hint" aria-hidden="true">드래그로 이동 &middot; 스크롤로 확대/축소</div>
+  </main>
+
+  <!-- ======================== SETTINGS PANEL ======================== -->
+  <div class="settings-backdrop" id="settings-backdrop" aria-hidden="true"></div>
+
+  <aside id="settings-panel" class="settings-panel" aria-label="설정">
+    <div class="settings-header">
+      <h2>설정</h2>
+      <button class="icon-btn" id="close-settings" title="닫기">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="settings-body">
+      <div class="settings-section">
+        <label class="settings-label" for="api-key-input">Anthropic API Key</label>
+        <div class="api-key-row">
+          <input
+            type="password"
+            id="api-key-input"
+            class="settings-input"
+            placeholder="sk-ant-..."
+            autocomplete="off"
+          >
+          <button class="save-btn" id="save-api-key">저장</button>
+        </div>
+        <p class="settings-hint">API 키는 이 브라우저에만 로컬 저장됩니다.</p>
+        <p class="api-status" id="api-status"></p>
+      </div>
+
+      <div class="settings-section">
+        <label class="settings-label" for="default-format">기본 출력 형식</label>
+        <select id="default-format" class="settings-select">
+          <option value="translate">번역</option>
+          <option value="explain">설명/해석</option>
+          <option value="summarize">요약</option>
+          <option value="bullets">불릿포인트</option>
+          <option value="rewrite">재작성</option>
+        </select>
+      </div>
+
+      <div class="settings-section">
+        <label class="settings-label" for="default-tone">기본 말투</label>
+        <select id="default-tone" class="settings-select">
+          <option value="neutral">중립</option>
+          <option value="formal">격식체</option>
+          <option value="casual">구어체</option>
+        </select>
+      </div>
+
+      <div class="settings-section">
+        <label class="settings-label" for="default-lang">기본 출력 언어</label>
+        <select id="default-lang" class="settings-select">
+          <option value="ko">한국어</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+          <option value="zh">中文</option>
+          <option value="es">Español</option>
+        </select>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
