@@ -39,6 +39,9 @@ const outTone         = $('out-tone');
 const outLang         = $('out-lang');
 const outputPlaceholder=$('output-placeholder');
 const outputText      = $('output-text');
+const outputImageWrap = $('output-image-wrap');
+const outputImageEl   = $('output-image');
+const outputImagePrompt=$('output-image-prompt');
 const skeletonWrap    = $('skeleton-wrap');
 const copyOutput      = $('copy-output');
 const downloadOutput  = $('download-output');
@@ -175,15 +178,6 @@ function bindSplitInput() {
     el.addEventListener('drop',      handleDrop);
   });
 
-  copyOutput.addEventListener('click', () => {
-    if (!splitOutputText) return;
-    navigator.clipboard.writeText(splitOutputText).then(() => showToast('클립보드에 복사됨'));
-  });
-
-  downloadOutput.addEventListener('click', () => {
-    if (!splitOutputText) return;
-    triggerDownload(splitOutputText, 'limber-output.txt');
-  });
 }
 
 function hasFiles(dt) {
@@ -220,36 +214,103 @@ function bindSplitTranslate() {
 
     setSplitLoading(true);
     try {
+      const fmt = outFormat.value;
       const result = await callClaude({
         text,
         imageBase64: splitImage.base64,
         imageType: splitImage.type,
-        format: outFormat.value,
+        format: fmt,
         tone: outTone.value,
         lang: outLang.value
       });
-      splitOutputText = result;
-      showSplitOutput(result);
+
+      if (fmt === 'image') {
+        showSplitImage(result);
+      } else {
+        splitOutputText = result;
+        showSplitOutput(result);
+      }
     } catch (err) {
       setSplitLoading(false);
       outputPlaceholder.hidden = false;
       showToast('오류: ' + (err.message || '알 수 없는 오류'));
     }
   });
+
+  copyOutput.addEventListener('click', () => {
+    if (!splitOutputText) return;
+    navigator.clipboard.writeText(splitOutputText).then(() => showToast('클립보드에 복사됨'));
+  });
+
+  downloadOutput.addEventListener('click', () => {
+    if (outFormat.value === 'image') {
+      downloadImage(outputImageEl.src);
+    } else if (splitOutputText) {
+      triggerDownload(splitOutputText, 'limber-output.txt');
+    }
+  });
 }
 
 function setSplitLoading(on) {
-  translateBtn.disabled = on;
-  skeletonWrap.hidden   = !on;
-  outputText.hidden     = on ? true : outputText.hidden;
+  translateBtn.disabled    = on;
+  skeletonWrap.hidden      = !on;
   outputPlaceholder.hidden = on;
+  if (on) {
+    outputText.hidden      = true;
+    outputImageWrap.hidden = true;
+  }
 }
 
 function showSplitOutput(text) {
   setSplitLoading(false);
   outputText.textContent = text;
-  outputText.hidden = false;
-  outputPlaceholder.hidden = true;
+  outputText.hidden      = false;
+  outputImageWrap.hidden = true;
+}
+
+function showSplitImage(prompt) {
+  // Keep skeleton visible while image loads
+  translateBtn.disabled = true;
+  outputText.hidden     = true;
+  outputImageWrap.hidden= true;
+
+  const url = buildPollinationsUrl(prompt);
+  outputImageEl.src = '';
+  outputImagePrompt.textContent = prompt;
+
+  outputImageEl.onload = () => {
+    skeletonWrap.hidden    = true;
+    outputImageWrap.hidden = false;
+    outputPlaceholder.hidden = true;
+    translateBtn.disabled  = false;
+  };
+  outputImageEl.onerror = () => {
+    skeletonWrap.hidden      = true;
+    outputPlaceholder.hidden = false;
+    translateBtn.disabled    = false;
+    showToast('이미지 생성에 실패했습니다. 다시 시도해주세요.');
+  };
+  outputImageEl.src = url;
+}
+
+function buildPollinationsUrl(prompt) {
+  const seed = Math.floor(Math.random() * 99999);
+  return 'https://image.pollinations.ai/prompt/' +
+    encodeURIComponent(prompt) +
+    '?width=896&height=640&model=flux&nologo=true&seed=' + seed;
+}
+
+async function downloadImage(src) {
+  try {
+    const res  = await fetch(src);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), { href: url, download: 'limber-image.png' });
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    showToast('이미지 다운로드에 실패했습니다.');
+  }
 }
 
 // ===== CLAUDE API =====
@@ -302,7 +363,8 @@ function buildSystemPrompt(format, tone, lang) {
     explain:   `주어진 텍스트(또는 이미지)를 ${langName}로 상세히 설명하고 해석해줘. ${toneName}를 사용해. 핵심 개념과 맥락을 포함해.`,
     summarize: `주어진 텍스트(또는 이미지의 텍스트)의 핵심을 ${langName}로 간결하게 요약해줘. ${toneName}를 사용해.`,
     bullets:   `주어진 텍스트(또는 이미지의 텍스트)의 핵심 내용을 ${langName}로 불릿 포인트(•) 목록으로 정리해줘. ${toneName}를 사용해.`,
-    rewrite:   `주어진 텍스트를 ${langName}로, ${toneName}로 다시 작성해줘. 의미는 유지하되 표현을 바꿔줘.`
+    rewrite:   `주어진 텍스트를 ${langName}로, ${toneName}로 다시 작성해줘. 의미는 유지하되 표현을 바꿔줘.`,
+    image:     `사용자가 입력한 내용을 분석하여, FLUX 이미지 생성 모델에 최적화된 영어 프롬프트를 작성해줘. 시각적으로 구체적이고 풍부한 묘사를 포함해야 해. 프롬프트 텍스트만 출력해. 다른 설명, 따옴표, 머릿말은 절대 쓰지 마. 예시 형식: "a serene mountain lake at sunrise, golden light reflecting on calm water, misty pine forest, photorealistic, cinematic"`
   };
 
   return prompts[format] || prompts.translate;
@@ -387,7 +449,7 @@ function spawnNode(parentId, x, y, inheritInput) {
   return id;
 }
 
-const FORMAT_LABELS = { translate: '번역', explain: '설명', summarize: '요약', bullets: '불릿', rewrite: '재작성' };
+const FORMAT_LABELS = { translate: '번역', explain: '설명', summarize: '요약', bullets: '불릿', rewrite: '재작성', image: '이미지' };
 
 function renderNodeCard(data) {
   const { id, x, y, input, format, tone, lang, output } = data;
@@ -416,6 +478,7 @@ function renderNodeCard(data) {
           <option value="summarize" ${format==='summarize'?'selected':''}>요약</option>
           <option value="bullets"   ${format==='bullets'  ?'selected':''}>불릿</option>
           <option value="rewrite"   ${format==='rewrite'  ?'selected':''}>재작성</option>
+          <option value="image"     ${format==='image'    ?'selected':''}>이미지</option>
         </select>
         <select class="node-select" data-sel="${id}" data-field="tone">
           <option value="neutral" ${tone==='neutral'?'selected':''}>중립</option>
@@ -554,7 +617,7 @@ async function runNodeTranslate(id) {
 
   trBtn.disabled = true;
   trBtn.textContent = '처리 중...';
-  outEl.textContent = '';
+  outEl.innerHTML = '';
   outEl.className = 'node-output is-empty';
 
   try {
@@ -563,8 +626,19 @@ async function runNodeTranslate(id) {
       format: d.format, tone: d.tone, lang: d.lang
     });
     d.output = result;
-    outEl.textContent = result;
-    outEl.className = 'node-output';
+
+    if (d.format === 'image') {
+      outEl.className = 'node-output';
+      const img = document.createElement('img');
+      img.style.cssText = 'width:100%;border-radius:6px;display:block;margin-top:4px';
+      img.alt = '생성된 이미지';
+      img.src = buildPollinationsUrl(result);
+      outEl.innerHTML = '';
+      outEl.appendChild(img);
+    } else {
+      outEl.textContent = result;
+      outEl.className = 'node-output';
+    }
   } catch (err) {
     outEl.textContent = '오류: ' + (err.message || '');
     outEl.className = 'node-output is-empty';

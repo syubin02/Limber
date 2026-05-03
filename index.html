@@ -105,8 +105,9 @@
           <option value="summarize">요약</option>
           <option value="bullets">불릿포인트</option>
           <option value="rewrite">재작성</option>
+          <option value="image">이미지 생성</option>
         </select>
-        <select id="out-tone" class="ctrl-select" aria-label="말투">
+        <select id="out-tone" class="ctrl-select" aria-label="말투" id="out-tone-wrap">
           <option value="neutral">중립</option>
           <option value="formal">격식체</option>
           <option value="casual">구어체</option>
@@ -123,6 +124,10 @@
       <div class="output-body">
         <p class="output-placeholder" id="output-placeholder">번역 결과가 여기에 표시됩니다</p>
         <div class="output-text" id="output-text" hidden></div>
+        <div class="output-image-wrap" id="output-image-wrap" hidden>
+          <img id="output-image" src="" alt="생성된 이미지">
+          <p class="output-image-prompt" id="output-image-prompt"></p>
+        </div>
         <div class="skeleton-wrap" id="skeleton-wrap" hidden aria-label="로딩 중" aria-live="polite">
           <div class="skeleton long"></div>
           <div class="skeleton medium"></div>

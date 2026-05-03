@@ -372,6 +372,30 @@ select, textarea, input {
   padding: 48px 0;
 }
 
+/* Image output */
+.output-image-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: fadeUp 250ms var(--ease) both;
+}
+
+.output-image-wrap img {
+  width: 100%;
+  border-radius: var(--radius-md);
+  display: block;
+  background: var(--surface-2);
+  min-height: 200px;
+}
+
+.output-image-prompt {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.5;
+  padding: 0 2px;
+}
+
 .output-text {
   font-size: 16px;
   line-height: 1.85;
