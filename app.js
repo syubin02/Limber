@@ -151,20 +151,28 @@ function bindSplitInput() {
 
   removeImage.addEventListener('click', clearSplitImage);
 
-  // Drag-and-drop
-  inputBody.addEventListener('dragenter', e => {
+  // Drag-and-drop — textarea intercepts events so listen on both
+  function handleDragEnter(e) {
     e.preventDefault();
     if (hasFiles(e.dataTransfer)) dropOverlay.classList.add('active');
-  });
-  inputBody.addEventListener('dragover', e => e.preventDefault());
-  inputBody.addEventListener('dragleave', e => {
+  }
+  function handleDragOver(e) { e.preventDefault(); }
+  function handleDragLeave(e) {
     if (!inputBody.contains(e.relatedTarget)) dropOverlay.classList.remove('active');
-  });
-  inputBody.addEventListener('drop', e => {
+  }
+  function handleDrop(e) {
     e.preventDefault();
+    e.stopPropagation();
     dropOverlay.classList.remove('active');
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) loadSplitImage(file);
+  }
+
+  [inputBody, inputText].forEach(el => {
+    el.addEventListener('dragenter', handleDragEnter);
+    el.addEventListener('dragover',  handleDragOver);
+    el.addEventListener('dragleave', handleDragLeave);
+    el.addEventListener('drop',      handleDrop);
   });
 
   copyOutput.addEventListener('click', () => {
@@ -503,11 +511,12 @@ function attachNodeEvents(card, id) {
     if (d) d.input = ta.value;
   });
 
-  // Image drop onto node
-  card.addEventListener('dragenter', e => { e.preventDefault(); e.stopPropagation(); card.style.borderColor = 'var(--primary)'; });
-  card.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); });
-  card.addEventListener('dragleave', e => { if (!card.contains(e.relatedTarget)) card.style.borderColor = ''; });
-  card.addEventListener('drop', e => {
+  // Image drop onto node — register on both card and its textarea
+  const nodeTextarea = card.querySelector('.node-textarea');
+  function nodeDropEnter(e) { e.preventDefault(); e.stopPropagation(); card.style.borderColor = 'var(--primary)'; }
+  function nodeDropOver(e)  { e.preventDefault(); e.stopPropagation(); }
+  function nodeDropLeave(e) { if (!card.contains(e.relatedTarget)) card.style.borderColor = ''; }
+  function nodeDropDrop(e) {
     e.preventDefault();
     e.stopPropagation();
     card.style.borderColor = '';
@@ -522,6 +531,13 @@ function attachNodeEvents(card, id) {
       showToast('이미지 첨부됨');
     };
     reader.readAsDataURL(file);
+  }
+
+  [card, nodeTextarea].forEach(el => {
+    el.addEventListener('dragenter', nodeDropEnter);
+    el.addEventListener('dragover',  nodeDropOver);
+    el.addEventListener('dragleave', nodeDropLeave);
+    el.addEventListener('drop',      nodeDropDrop);
   });
 }
 
