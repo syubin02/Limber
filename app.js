@@ -6,6 +6,21 @@ let splitImage = { base64: null, type: null };
 let splitOutputText = '';
 let accessPassword = '';
 
+const TONE_INPUT_LABELS = {
+  neutral: '중립',
+  formal: '격식체',
+  casual: '구어체',
+};
+
+const TONE_INPUT_VALUES = {
+  neutral: 'neutral',
+  formal: 'formal',
+  casual: 'casual',
+  '중립': 'neutral',
+  '격식체': 'formal',
+  '구어체': 'casual',
+};
+
 // Node canvas state
 const nodeMap = new Map();
 let nodeIdSeq = 0;
@@ -150,7 +165,7 @@ function loadPersistedSettings() {
   const lang = localStorage.getItem('limber_lang')   || 'ko';
 
   outFormat.value = fmt;
-  outTone.value   = tone;
+  outTone.value   = toneInputValue(tone);
   outLang.value   = lang;
   if (defaultFormat) defaultFormat.value = fmt;
   if (defaultTone)   defaultTone.value   = tone;
@@ -188,7 +203,7 @@ function bindSettingsPanel() {
   if (defaultTone) {
     defaultTone.addEventListener('change', () => {
       localStorage.setItem('limber_tone', defaultTone.value);
-      outTone.value = defaultTone.value;
+      outTone.value = toneInputValue(defaultTone.value);
     });
   }
   if (defaultLang) {
@@ -197,6 +212,17 @@ function bindSettingsPanel() {
       outLang.value = defaultLang.value;
     });
   }
+}
+
+function toneInputValue(tone) {
+  return TONE_INPUT_LABELS[tone] || tone || TONE_INPUT_LABELS.neutral;
+}
+
+function resolveToneInput(value) {
+  const raw = value.trim();
+  const tone = TONE_INPUT_VALUES[raw];
+  if (tone) return { tone, customStyle: '' };
+  return { tone: 'neutral', customStyle: raw };
 }
 
 function openSettingsPanel() {
@@ -276,14 +302,15 @@ function bindSplitTranslate() {
     setSplitLoading(true);
     try {
       const fmt = outFormat.value;
+      const tonePayload = resolveToneInput(outTone.value);
       const result = await callChat({
         text,
         imageBase64: splitImage.base64,
         imageType:   splitImage.type,
         format: fmt,
-        tone:   outTone.value,
+        tone:   tonePayload.tone,
         lang:   outLang.value,
-        customStyle: $('out-custom-style').value.trim(),
+        customStyle: tonePayload.customStyle,
       });
 
       if (fmt === 'image') {

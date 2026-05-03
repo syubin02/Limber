@@ -436,6 +436,12 @@ select, textarea, input {
   border-color: rgba(255, 97, 0, 0.5);
 }
 
+.ctrl-tone {
+  flex: 1.2;
+  min-width: 140px;
+  width: auto;
+}
+
 .ctrl-select {
   flex: 1;
   min-width: 0;

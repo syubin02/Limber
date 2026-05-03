@@ -128,13 +128,6 @@
       </div>
 
       <div class="output-controls">
-        <input
-          type="text"
-          id="out-custom-style"
-          class="ctrl-input"
-          placeholder="말투 직접 입력 (예: 오은영 박사 말투, 힙합 가사체, ISTP 말투)"
-          autocomplete="off"
-        >
         <select id="out-format" class="ctrl-select" aria-label="출력 형식">
           <option value="translate">번역</option>
           <option value="explain">설명/해석</option>
@@ -145,11 +138,23 @@
           <option value="audio">음성 생성</option>
           <option value="video">동영상 생성</option>
         </select>
-        <select id="out-tone" class="ctrl-select" aria-label="말투">
-          <option value="neutral">중립</option>
-          <option value="formal">격식체</option>
-          <option value="casual">구어체</option>
-        </select>
+        <input
+          type="text"
+          id="out-tone"
+          class="ctrl-input ctrl-tone"
+          list="tone-presets"
+          placeholder="말투 선택 또는 직접 입력"
+          autocomplete="off"
+          aria-label="말투"
+        >
+        <datalist id="tone-presets">
+          <option value="중립"></option>
+          <option value="격식체"></option>
+          <option value="구어체"></option>
+          <option value="오은영 박사 말투"></option>
+          <option value="힙합 가사체"></option>
+          <option value="ISTP 말투"></option>
+        </datalist>
         <select id="out-lang" class="ctrl-select" aria-label="출력 언어">
           <option value="ko">한국어</option>
           <option value="en">English</option>
