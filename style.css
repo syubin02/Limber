@@ -385,7 +385,6 @@ select, textarea, input {
   border-radius: var(--radius-md);
   display: block;
   background: var(--surface-2);
-  min-height: 200px;
 }
 
 .output-image-prompt {
@@ -394,6 +393,52 @@ select, textarea, input {
   font-style: italic;
   line-height: 1.5;
   padding: 0 2px;
+}
+
+/* Image generating loading state */
+.image-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed rgba(255, 97, 0, 0.25);
+  background: rgba(255, 97, 0, 0.04);
+  animation: fadeUp 200ms var(--ease) both;
+}
+
+.image-loading-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 40px;
+  text-align: center;
+}
+
+.image-spinner {
+  width: 36px;
+  height: 36px;
+  border: 2.5px solid rgba(255, 97, 0, 0.2);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.image-loading-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.image-loading-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.7;
 }
 
 .output-text {

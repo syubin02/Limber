@@ -128,6 +128,13 @@
           <img id="output-image" src="" alt="생성된 이미지">
           <p class="output-image-prompt" id="output-image-prompt"></p>
         </div>
+        <div class="image-loading" id="image-loading" hidden aria-live="polite">
+          <div class="image-loading-inner">
+            <div class="image-spinner"></div>
+            <p class="image-loading-title">이미지 생성 중</p>
+            <p class="image-loading-sub">FLUX 모델이 이미지를 만들고 있습니다<br>20–60초 정도 소요될 수 있어요</p>
+          </div>
+        </div>
         <div class="skeleton-wrap" id="skeleton-wrap" hidden aria-label="로딩 중" aria-live="polite">
           <div class="skeleton long"></div>
           <div class="skeleton medium"></div>

@@ -42,6 +42,7 @@ const outputText      = $('output-text');
 const outputImageWrap = $('output-image-wrap');
 const outputImageEl   = $('output-image');
 const outputImagePrompt=$('output-image-prompt');
+const imageLoading    = $('image-loading');
 const skeletonWrap    = $('skeleton-wrap');
 const copyOutput      = $('copy-output');
 const downloadOutput  = $('download-output');
@@ -258,6 +259,7 @@ function setSplitLoading(on) {
   if (on) {
     outputText.hidden      = true;
     outputImageWrap.hidden = true;
+    imageLoading.hidden    = true;
   }
 }
 
@@ -269,27 +271,49 @@ function showSplitOutput(text) {
 }
 
 function showSplitImage(prompt) {
-  // Keep skeleton visible while image loads
-  translateBtn.disabled = true;
-  outputText.hidden     = true;
-  outputImageWrap.hidden= true;
+  // Claude returned the prompt — switch from text skeleton to image loading UI
+  skeletonWrap.hidden      = true;
+  outputText.hidden        = true;
+  outputImageWrap.hidden   = true;
+  outputPlaceholder.hidden = true;
+  imageLoading.hidden      = false;
+  translateBtn.disabled    = true;
 
-  const url = buildPollinationsUrl(prompt);
-  outputImageEl.src = '';
   outputImagePrompt.textContent = prompt;
+  const url = buildPollinationsUrl(prompt);
 
-  outputImageEl.onload = () => {
-    skeletonWrap.hidden    = true;
+  function onLoad() {
+    clearTimeout(timer);
+    outputImageEl.removeEventListener('load',  onLoad);
+    outputImageEl.removeEventListener('error', onError);
+    imageLoading.hidden    = true;
     outputImageWrap.hidden = false;
-    outputPlaceholder.hidden = true;
     translateBtn.disabled  = false;
-  };
-  outputImageEl.onerror = () => {
-    skeletonWrap.hidden      = true;
+  }
+
+  function onError() {
+    clearTimeout(timer);
+    outputImageEl.removeEventListener('load',  onLoad);
+    outputImageEl.removeEventListener('error', onError);
+    imageLoading.hidden      = true;
     outputPlaceholder.hidden = false;
     translateBtn.disabled    = false;
     showToast('이미지 생성에 실패했습니다. 다시 시도해주세요.');
-  };
+  }
+
+  // 90s timeout — Pollinations can be slow under load
+  const timer = setTimeout(() => {
+    outputImageEl.removeEventListener('load',  onLoad);
+    outputImageEl.removeEventListener('error', onError);
+    outputImageEl.src        = '';
+    imageLoading.hidden      = true;
+    outputPlaceholder.hidden = false;
+    translateBtn.disabled    = false;
+    showToast('이미지 생성 시간이 초과됐습니다. 다시 시도해주세요.');
+  }, 90000);
+
+  outputImageEl.addEventListener('load',  onLoad);
+  outputImageEl.addEventListener('error', onError);
   outputImageEl.src = url;
 }
 
