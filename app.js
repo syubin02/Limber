@@ -4,7 +4,7 @@
 let currentMode = 'split';
 let splitImage = { base64: null, type: null };
 let splitOutputText = '';
-const ACCESS_PASSWORD_KEY = 'limber_access_password';
+let accessPassword = '';
 
 // Node canvas state
 const nodeMap = new Map();
@@ -84,7 +84,7 @@ function init() {
 
 // ===== ACCESS GATE =====
 function getAccessPassword() {
-  return localStorage.getItem(ACCESS_PASSWORD_KEY) || '';
+  return accessPassword;
 }
 
 function apiHeaders(extra) {
@@ -98,7 +98,7 @@ async function assertApiOk(res) {
   if (res.ok) return;
   const body = await res.json().catch(() => ({}));
   if (res.status === 401) {
-    localStorage.removeItem(ACCESS_PASSWORD_KEY);
+    accessPassword = '';
     showAuthGate('비밀번호를 다시 확인해주세요');
     throw new Error('비밀번호 확인 필요');
   }
@@ -116,19 +116,19 @@ function bindAuthGate() {
       authPassword.focus();
       return;
     }
-    localStorage.setItem(ACCESS_PASSWORD_KEY, password);
+    accessPassword = password;
     hideAuthGate();
     showToast('잠금 해제됨');
   });
 
   if (authLogout) {
     authLogout.addEventListener('click', () => {
-      localStorage.removeItem(ACCESS_PASSWORD_KEY);
+      accessPassword = '';
       showAuthGate('잠겼습니다');
     });
   }
 
-  if (!getAccessPassword()) showAuthGate();
+  showAuthGate();
 }
 
 function showAuthGate(message) {
