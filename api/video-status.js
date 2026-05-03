@@ -10,7 +10,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const pollRes = await fetch(`https://api.openai.com/v1/video/generations/${id}`, {
-      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+      headers: { 'Authorization': `Bearer ${process.env.limber_key}` },
     });
 
     if (!pollRes.ok) {

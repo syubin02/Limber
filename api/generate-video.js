@@ -12,7 +12,7 @@ module.exports = async function handler(req, res) {
     const createRes = await fetch('https://api.openai.com/v1/video/generations', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${process.env.limber_key}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
