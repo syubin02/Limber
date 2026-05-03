@@ -12,23 +12,21 @@ module.exports = async function handler(req, res) {
   if (!id) return res.status(400).json({ error: 'id required' });
 
   try {
-    const pollRes = await fetch(`https://api.openai.com/v1/videos/${id}`, {
+    const contentRes = await fetch(`https://api.openai.com/v1/videos/${id}/content`, {
       headers: { 'Authorization': `Bearer ${process.env.limber_key}` },
     });
 
-    if (!pollRes.ok) {
-      const body = await pollRes.json().catch(() => ({}));
-      throw new Error(body.error?.message || `HTTP ${pollRes.status}`);
+    if (!contentRes.ok) {
+      const body = await contentRes.json().catch(() => ({}));
+      throw new Error(body.error?.message || `HTTP ${contentRes.status}`);
     }
 
-    const data = await pollRes.json();
-    res.status(200).json({
-      status: data.status,
-      progress: data.progress || 0,
-      error: data.error?.message || null,
-    });
+    const buffer = Buffer.from(await contentRes.arrayBuffer());
+    res.setHeader('Content-Type', contentRes.headers.get('content-type') || 'video/mp4');
+    res.setHeader('Content-Length', buffer.length);
+    res.status(200).end(buffer);
   } catch (err) {
-    console.error('video status error:', err);
-    res.status(500).json({ error: err.message || 'Status check failed' });
+    console.error('video content error:', err);
+    res.status(500).json({ error: err.message || 'Video content download failed' });
   }
-}
+};

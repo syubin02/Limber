@@ -1,3 +1,5 @@
+const { requireAccess } = require('./auth');
+
 function buildSystemPrompt(format, tone, lang, customStyle) {
   const langName = { ko: '한국어', en: 'English', ja: '日本語', zh: '中文', es: 'Español' }[lang] || lang;
   const toneName = {
@@ -27,9 +29,10 @@ function buildSystemPrompt(format, tone, lang, customStyle) {
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Limber-Password');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!requireAccess(req, res)) return;
 
   const { text, imageBase64, imageType, format, tone, lang, customStyle } = req.body || {};
   if (!text && !imageBase64) return res.status(400).json({ error: 'text or imageBase64 required' });

@@ -4,6 +4,7 @@
 let currentMode = 'split';
 let splitImage = { base64: null, type: null };
 let splitOutputText = '';
+const ACCESS_PASSWORD_KEY = 'limber_access_password';
 
 // Node canvas state
 const nodeMap = new Map();
@@ -20,6 +21,11 @@ const nodeView         = $('node-view');
 const splitBtn         = $('split-btn');
 const nodeBtn          = $('node-btn');
 const settingsBtn      = $('settings-btn');
+const authLogout       = $('auth-logout');
+const authGate         = $('auth-gate');
+const authForm         = $('auth-form');
+const authPassword     = $('auth-password');
+const authError        = $('auth-error');
 const settingsPanel    = $('settings-panel');
 const settingsBackdrop = $('settings-backdrop');
 const closeSettings    = $('close-settings');
@@ -65,6 +71,7 @@ const toastEl          = $('toast');
 
 // ===== INIT =====
 function init() {
+  bindAuthGate();
   loadPersistedSettings();
   bindModeToggle();
   bindSettingsPanel();
@@ -73,6 +80,67 @@ function init() {
   bindSpeakButton();
   bindNodeCanvas();
   bindNodeToolbar();
+}
+
+// ===== ACCESS GATE =====
+function getAccessPassword() {
+  return localStorage.getItem(ACCESS_PASSWORD_KEY) || '';
+}
+
+function apiHeaders(extra) {
+  const headers = Object.assign({}, extra);
+  const password = getAccessPassword();
+  if (password) headers['X-Limber-Password'] = password;
+  return headers;
+}
+
+async function assertApiOk(res) {
+  if (res.ok) return;
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    localStorage.removeItem(ACCESS_PASSWORD_KEY);
+    showAuthGate('비밀번호를 다시 확인해주세요');
+    throw new Error('비밀번호 확인 필요');
+  }
+  throw new Error(body.error || `HTTP ${res.status}`);
+}
+
+function bindAuthGate() {
+  if (!authGate || !authForm) return;
+
+  authForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const password = authPassword.value.trim();
+    if (!password) {
+      authError.textContent = '비밀번호를 입력해주세요';
+      authPassword.focus();
+      return;
+    }
+    localStorage.setItem(ACCESS_PASSWORD_KEY, password);
+    hideAuthGate();
+    showToast('잠금 해제됨');
+  });
+
+  if (authLogout) {
+    authLogout.addEventListener('click', () => {
+      localStorage.removeItem(ACCESS_PASSWORD_KEY);
+      showAuthGate('잠겼습니다');
+    });
+  }
+
+  if (!getAccessPassword()) showAuthGate();
+}
+
+function showAuthGate(message) {
+  authGate.hidden = false;
+  authError.textContent = message || '';
+  authPassword.value = '';
+  requestAnimationFrame(() => authPassword.focus());
+}
+
+function hideAuthGate() {
+  authGate.hidden = true;
+  authError.textContent = '';
 }
 
 // ===== SETTINGS PERSISTENCE =====
@@ -268,10 +336,12 @@ function setSplitLoading(on) {
 
 function showSplitOutput(text) {
   setSplitLoading(false);
+  outputPlaceholder.hidden = true;
   outputText.textContent = text;
   outputText.hidden      = false;
   outputImageWrap.hidden = true;
   outputAudioWrap.hidden = true;
+  outputVideoWrap.hidden = true;
   speakBtn.disabled      = false;
 }
 
@@ -312,13 +382,10 @@ async function showSplitImage(prompt) {
   try {
     const res = await fetch('/api/generate-image', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ prompt }),
     });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `HTTP ${res.status}`);
-    }
+    await assertApiOk(res);
     const { url, revisedPrompt } = await res.json();
 
     outputImagePrompt.textContent = revisedPrompt || prompt;
@@ -353,6 +420,10 @@ async function showSplitImage(prompt) {
 // ===== AUDIO OUTPUT (OpenAI TTS HD) =====
 async function showSplitAudio(text) {
   setSplitLoading(false);
+  outputPlaceholder.hidden = true;
+  outputText.hidden        = true;
+  outputImageWrap.hidden   = true;
+  outputVideoWrap.hidden   = true;
   outputAudioText.textContent = text;
   outputAudioWrap.hidden      = false;
   audioGenerating.hidden      = false;
@@ -362,10 +433,10 @@ async function showSplitAudio(text) {
   try {
     const res = await fetch('/api/generate-audio', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ text, lang: outLang.value }),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await assertApiOk(res);
 
     const blob = await res.blob();
     const blobUrl = URL.createObjectURL(blob);
@@ -378,7 +449,7 @@ async function showSplitAudio(text) {
   }
 }
 
-// ===== VIDEO OUTPUT (Sora) =====
+// ===== VIDEO OUTPUT (Sora 2) =====
 let videoTimerId = null;
 
 function startVideoTimer() {
@@ -406,31 +477,32 @@ async function showSplitVideo(prompt) {
   try {
     const startRes = await fetch('/api/generate-video', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ prompt }),
     });
-    if (!startRes.ok) {
-      const body = await startRes.json().catch(() => ({}));
-      throw new Error(body.error || `HTTP ${startRes.status}`);
-    }
+    await assertApiOk(startRes);
     const { id } = await startRes.json();
 
     const deadline = Date.now() + 10 * 60 * 1000;
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 5000));
-      const statusRes = await fetch(`/api/video-status?id=${encodeURIComponent(id)}`);
+      const statusRes = await fetch(`/api/video-status?id=${encodeURIComponent(id)}`, {
+        headers: apiHeaders(),
+      });
+      await assertApiOk(statusRes);
       const status    = await statusRes.json();
 
-      if (status.status === 'completed' && status.url) {
+      if (status.status === 'completed') {
+        const url = await fetchVideoObjectUrl(id);
         stopVideoTimer();
         outputVideoPrompt.textContent = prompt;
-        outputVideoEl.src             = status.url;
+        outputVideoEl.src             = url;
         videoLoading.hidden           = true;
         outputVideoWrap.hidden        = false;
         translateBtn.disabled         = false;
         return;
       }
-      if (status.status === 'failed') throw new Error('동영상 생성 실패');
+      if (status.status === 'failed') throw new Error(status.error || '동영상 생성 실패');
     }
     throw new Error('시간 초과 (10분)');
   } catch (err) {
@@ -440,6 +512,14 @@ async function showSplitVideo(prompt) {
     translateBtn.disabled    = false;
     showToast('동영상 생성 오류: ' + (err.message || ''));
   }
+}
+
+async function fetchVideoObjectUrl(id) {
+  const res = await fetch(`/api/video-content?id=${encodeURIComponent(id)}`, {
+    headers: apiHeaders(),
+  });
+  await assertApiOk(res);
+  return URL.createObjectURL(await res.blob());
 }
 
 async function downloadImage(src) {
@@ -459,13 +539,10 @@ async function downloadImage(src) {
 async function callChat({ text, imageBase64, imageType, format, tone, lang, customStyle }) {
   const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: apiHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ text, imageBase64, imageType, format, tone, lang, customStyle }),
   });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `HTTP ${res.status}`);
-  }
+  await assertApiOk(res);
   const data = await res.json();
   return data.result;
 }
@@ -707,8 +784,11 @@ async function runNodeTranslate(id) {
   if (!d) return;
   if (!d.input && !d.image.base64) { showToast('텍스트 또는 이미지를 입력해주세요'); return; }
 
+  const card = document.getElementById('nc-' + id);
   const trBtn = document.querySelector(`[data-tr="${id}"]`);
   const outEl = document.getElementById('no-' + id);
+  const cstInput = card ? card.querySelector('[data-cst]') : null;
+  if (!trBtn || !outEl) return;
 
   trBtn.disabled = true;
   trBtn.textContent = '처리 중...';
@@ -716,7 +796,6 @@ async function runNodeTranslate(id) {
   outEl.className = 'node-output is-empty';
 
   try {
-    const cstInput = card.querySelector('[data-cst]');
     const result = await callChat({
       text: d.input, imageBase64: d.image.base64, imageType: d.image.type,
       format: d.format, tone: d.tone, lang: d.lang,
@@ -729,10 +808,10 @@ async function runNodeTranslate(id) {
       outEl.textContent = '이미지 생성 중...';
       const imgRes = await fetch('/api/generate-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ prompt: result }),
       });
-      if (!imgRes.ok) throw new Error('이미지 생성 실패');
+      await assertApiOk(imgRes);
       const { url } = await imgRes.json();
       const img = document.createElement('img');
       img.style.cssText = 'width:100%;border-radius:6px;display:block;margin-top:4px';
@@ -745,10 +824,10 @@ async function runNodeTranslate(id) {
       outEl.textContent = '음성 생성 중...';
       const audioRes = await fetch('/api/generate-audio', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ text: result, lang: d.lang }),
       });
-      if (!audioRes.ok) throw new Error('음성 생성 실패');
+      await assertApiOk(audioRes);
       const blob    = await audioRes.blob();
       const blobUrl = URL.createObjectURL(blob);
       outEl.innerHTML = `<p style="font-size:12px;line-height:1.6;margin-bottom:8px">${escHtml(result)}</p>
@@ -758,27 +837,31 @@ async function runNodeTranslate(id) {
       outEl.textContent = '동영상 생성 중... (2–5분 소요)';
       const startRes = await fetch('/api/generate-video', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ prompt: result }),
       });
-      if (!startRes.ok) throw new Error('동영상 생성 시작 실패');
+      await assertApiOk(startRes);
       const { id: jobId } = await startRes.json();
 
       const deadline = Date.now() + 10 * 60 * 1000;
-      const poll = async () => {
-        if (Date.now() > deadline) { outEl.textContent = '시간 초과'; return; }
-        const statusRes = await fetch(`/api/video-status?id=${encodeURIComponent(jobId)}`);
+      let completed = false;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 5000));
+        const statusRes = await fetch(`/api/video-status?id=${encodeURIComponent(jobId)}`, {
+          headers: apiHeaders(),
+        });
+        await assertApiOk(statusRes);
         const status    = await statusRes.json();
-        if (status.status === 'completed' && status.url) {
-          outEl.innerHTML = `<video controls playsinline src="${status.url}"
+        if (status.status === 'completed') {
+          const url = await fetchVideoObjectUrl(jobId);
+          outEl.innerHTML = `<video controls playsinline src="${url}"
             style="width:100%;border-radius:6px;display:block;max-height:200px;background:#000"></video>`;
-        } else if (status.status === 'failed') {
-          outEl.textContent = '동영상 생성 실패';
-        } else {
-          setTimeout(poll, 5000);
+          completed = true;
+          break;
         }
-      };
-      setTimeout(poll, 5000);
+        if (status.status === 'failed') throw new Error(status.error || '동영상 생성 실패');
+      }
+      if (!completed) throw new Error('시간 초과 (10분)');
     } else {
       outEl.textContent = result;
       outEl.className = 'node-output';
