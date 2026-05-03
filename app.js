@@ -21,6 +21,26 @@ const TONE_INPUT_VALUES = {
   '구어체': 'casual',
 };
 
+const CONTROL_LABELS = {
+  format: {
+    translate: '번역',
+    explain: '설명/해석',
+    summarize: '요약',
+    bullets: '불릿포인트',
+    rewrite: '재작성',
+    image: '이미지 생성',
+    audio: '음성 생성',
+    video: '동영상 생성',
+  },
+  lang: {
+    ko: '한국어',
+    en: 'English',
+    ja: '日本語',
+    zh: '中文',
+    es: 'Español',
+  },
+};
+
 // Node canvas state
 const nodeMap = new Map();
 let nodeIdSeq = 0;
@@ -53,11 +73,15 @@ const removeImage      = $('remove-image');
 const clearInput       = $('clear-input');
 const translateBtn     = $('translate-btn');
 const outFormat        = $('out-format');
+const outFormatBtn     = $('out-format-btn');
+const outFormatMenu    = $('out-format-menu');
 const outTone          = $('out-tone');
 const toneCombo        = $('tone-combo');
 const toneMenuBtn      = $('tone-menu-btn');
 const toneMenu         = $('tone-menu');
 const outLang          = $('out-lang');
+const outLangBtn       = $('out-lang-btn');
+const outLangMenu      = $('out-lang-menu');
 const outputPlaceholder= $('output-placeholder');
 const outputText       = $('output-text');
 const outputImageWrap  = $('output-image-wrap');
@@ -93,6 +117,8 @@ function init() {
   loadPersistedSettings();
   bindModeToggle();
   bindSettingsPanel();
+  bindCustomSelect(outFormat, outFormatBtn, outFormatMenu, CONTROL_LABELS.format);
+  bindCustomSelect(outLang, outLangBtn, outLangMenu, CONTROL_LABELS.lang);
   bindToneMenu();
   bindSplitInput();
   bindSplitTranslate();
@@ -168,9 +194,9 @@ function loadPersistedSettings() {
   const tone = localStorage.getItem('limber_tone')   || 'neutral';
   const lang = localStorage.getItem('limber_lang')   || 'ko';
 
-  outFormat.value = fmt;
+  setCustomSelectValue(outFormat, outFormatBtn, CONTROL_LABELS.format, fmt);
   outTone.value   = toneInputValue(tone);
-  outLang.value   = lang;
+  setCustomSelectValue(outLang, outLangBtn, CONTROL_LABELS.lang, lang);
   if (defaultFormat) defaultFormat.value = fmt;
   if (defaultTone)   defaultTone.value   = tone;
   if (defaultLang)   defaultLang.value   = lang;
@@ -201,7 +227,7 @@ function bindSettingsPanel() {
   if (defaultFormat) {
     defaultFormat.addEventListener('change', () => {
       localStorage.setItem('limber_format', defaultFormat.value);
-      outFormat.value = defaultFormat.value;
+      setCustomSelectValue(outFormat, outFormatBtn, CONTROL_LABELS.format, defaultFormat.value);
     });
   }
   if (defaultTone) {
@@ -213,9 +239,51 @@ function bindSettingsPanel() {
   if (defaultLang) {
     defaultLang.addEventListener('change', () => {
       localStorage.setItem('limber_lang', defaultLang.value);
-      outLang.value = defaultLang.value;
+      setCustomSelectValue(outLang, outLangBtn, CONTROL_LABELS.lang, defaultLang.value);
     });
   }
+}
+
+function bindCustomSelect(input, button, menu, labels) {
+  if (!input || !button || !menu) return;
+
+  button.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleCustomSelect(menu, button, menu.hidden);
+  });
+
+  menu.addEventListener('click', e => {
+    const option = e.target.closest('[data-select-value]');
+    if (!option) return;
+    setCustomSelectValue(input, button, labels, option.dataset.selectValue);
+    toggleCustomSelect(menu, button, false);
+  });
+
+  button.addEventListener('keydown', e => {
+    if (e.key === 'Escape') toggleCustomSelect(menu, button, false);
+  });
+
+  document.addEventListener('click', e => {
+    if (!menu.parentElement.contains(e.target)) toggleCustomSelect(menu, button, false);
+  });
+}
+
+function setCustomSelectValue(input, button, labels, value) {
+  input.value = value;
+  const label = labels[value] || value;
+  button.querySelector('span').textContent = label;
+}
+
+function toggleCustomSelect(menu, button, open) {
+  document.querySelectorAll('.select-menu').forEach(otherMenu => {
+    if (otherMenu !== menu) {
+      otherMenu.hidden = true;
+      const otherButton = otherMenu.parentElement.querySelector('.select-display');
+      if (otherButton) otherButton.setAttribute('aria-expanded', 'false');
+    }
+  });
+  menu.hidden = !open;
+  button.setAttribute('aria-expanded', String(open));
 }
 
 function toneInputValue(tone) {
