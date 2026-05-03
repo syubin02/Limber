@@ -215,6 +215,7 @@ function bindSplitTranslate() {
         format: fmt,
         tone:   outTone.value,
         lang:   outLang.value,
+        customStyle: $('out-custom-style').value.trim(),
       });
 
       if (fmt === 'image') {
@@ -455,11 +456,11 @@ async function downloadImage(src) {
 }
 
 // ===== API =====
-async function callChat({ text, imageBase64, imageType, format, tone, lang }) {
+async function callChat({ text, imageBase64, imageType, format, tone, lang, customStyle }) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, imageBase64, imageType, format, tone, lang }),
+    body: JSON.stringify({ text, imageBase64, imageType, format, tone, lang, customStyle }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -570,6 +571,7 @@ function renderNodeCard(data) {
     <div class="node-body">
       <textarea class="node-textarea" data-ta="${id}" placeholder="텍스트 입력 또는 이미지 드래그" spellcheck="false">${escHtml(input)}</textarea>
       <div class="node-output ${output ? '' : 'is-empty'}" id="no-${id}">${output ? escHtml(output) : '번역 결과가 여기에 표시됩니다'}</div>
+      <input type="text" class="node-custom-style" data-cst="${id}" placeholder="말투 직접 입력 (예: 오은영 말투, ISTP 말투)">
       <div class="node-selects">
         <select class="node-select" data-sel="${id}" data-field="format">
           <option value="translate" ${format==='translate'?'selected':''}>번역</option>
@@ -714,9 +716,11 @@ async function runNodeTranslate(id) {
   outEl.className = 'node-output is-empty';
 
   try {
+    const cstInput = card.querySelector('[data-cst]');
     const result = await callChat({
       text: d.input, imageBase64: d.image.base64, imageType: d.image.type,
       format: d.format, tone: d.tone, lang: d.lang,
+      customStyle: cstInput ? cstInput.value.trim() : '',
     });
     d.output = result;
 
