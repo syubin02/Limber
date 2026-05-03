@@ -43,6 +43,11 @@ const outputImageWrap = $('output-image-wrap');
 const outputImageEl   = $('output-image');
 const outputImagePrompt=$('output-image-prompt');
 const imageLoading    = $('image-loading');
+const outputAudioWrap = $('output-audio-wrap');
+const outputAudioText = $('output-audio-text');
+const audioGenerating = $('audio-generating');
+const audioPlayer     = $('audio-player');
+const speakBtn        = $('speak-btn');
 const skeletonWrap    = $('skeleton-wrap');
 const copyOutput      = $('copy-output');
 const downloadOutput  = $('download-output');
@@ -63,6 +68,7 @@ function init() {
   bindSettingsPanel();
   bindSplitInput();
   bindSplitTranslate();
+  bindSpeakButton();
   bindNodeCanvas();
   bindNodeToolbar();
 }
@@ -227,6 +233,8 @@ function bindSplitTranslate() {
 
       if (fmt === 'image') {
         showSplitImage(result);
+      } else if (fmt === 'audio') {
+        showSplitAudio(result);
       } else {
         splitOutputText = result;
         showSplitOutput(result);
@@ -259,7 +267,10 @@ function setSplitLoading(on) {
   if (on) {
     outputText.hidden      = true;
     outputImageWrap.hidden = true;
+    outputAudioWrap.hidden = true;
     imageLoading.hidden    = true;
+    speakBtn.disabled      = true;
+    stopSpeaking();
   }
 }
 
@@ -268,6 +279,33 @@ function showSplitOutput(text) {
   outputText.textContent = text;
   outputText.hidden      = false;
   outputImageWrap.hidden = true;
+  outputAudioWrap.hidden = true;
+  speakBtn.disabled      = false;
+}
+
+// ===== SPEAK BUTTON (Web Speech API) =====
+function bindSpeakButton() {
+  if (!('speechSynthesis' in window)) { speakBtn.hidden = true; return; }
+
+  speakBtn.addEventListener('click', () => {
+    if (speechSynthesis.speaking) {
+      stopSpeaking();
+    } else {
+      const text = splitOutputText || outputAudioText.textContent;
+      if (!text) return;
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN', es: 'es-ES' }[outLang.value] || 'ko-KR';
+      utt.onend = () => speakBtn.classList.remove('speaking');
+      utt.onerror = () => speakBtn.classList.remove('speaking');
+      speechSynthesis.speak(utt);
+      speakBtn.classList.add('speaking');
+    }
+  });
+}
+
+function stopSpeaking() {
+  if ('speechSynthesis' in window && speechSynthesis.speaking) speechSynthesis.cancel();
+  speakBtn.classList.remove('speaking');
 }
 
 function showSplitImage(prompt) {
@@ -315,6 +353,38 @@ function showSplitImage(prompt) {
   outputImageEl.addEventListener('load',  onLoad);
   outputImageEl.addEventListener('error', onError);
   outputImageEl.src = url;
+}
+
+function showSplitAudio(text) {
+  setSplitLoading(false);
+  outputAudioText.textContent = text;
+  outputAudioWrap.hidden      = false;
+  audioGenerating.hidden      = false;
+  audioPlayer.hidden          = true;
+  speakBtn.disabled           = false;
+
+  const voice = { ko: 'nova', ja: 'shimmer', zh: 'shimmer', es: 'alloy', en: 'alloy' }[outLang.value] || 'nova';
+  const url   = 'https://text.pollinations.ai/' +
+    encodeURIComponent(text.slice(0, 800)) +
+    '?model=openai-audio&voice=' + voice;
+
+  function onCanPlay() {
+    audioPlayer.removeEventListener('canplaythrough', onCanPlay);
+    audioPlayer.removeEventListener('error', onAudioErr);
+    audioGenerating.hidden = true;
+    audioPlayer.hidden     = false;
+  }
+  function onAudioErr() {
+    audioPlayer.removeEventListener('canplaythrough', onCanPlay);
+    audioPlayer.removeEventListener('error', onAudioErr);
+    audioGenerating.hidden = true;
+    showToast('음성 생성에 실패했습니다. 다시 시도해주세요.');
+  }
+
+  audioPlayer.addEventListener('canplaythrough', onCanPlay);
+  audioPlayer.addEventListener('error', onAudioErr);
+  audioPlayer.src = url;
+  audioPlayer.load();
 }
 
 function buildPollinationsUrl(prompt) {
@@ -388,7 +458,8 @@ function buildSystemPrompt(format, tone, lang) {
     summarize: `주어진 텍스트(또는 이미지의 텍스트)의 핵심을 ${langName}로 간결하게 요약해줘. ${toneName}를 사용해.`,
     bullets:   `주어진 텍스트(또는 이미지의 텍스트)의 핵심 내용을 ${langName}로 불릿 포인트(•) 목록으로 정리해줘. ${toneName}를 사용해.`,
     rewrite:   `주어진 텍스트를 ${langName}로, ${toneName}로 다시 작성해줘. 의미는 유지하되 표현을 바꿔줘.`,
-    image:     `사용자가 입력한 내용을 분석하여, FLUX 이미지 생성 모델에 최적화된 영어 프롬프트를 작성해줘. 시각적으로 구체적이고 풍부한 묘사를 포함해야 해. 프롬프트 텍스트만 출력해. 다른 설명, 따옴표, 머릿말은 절대 쓰지 마. 예시 형식: "a serene mountain lake at sunrise, golden light reflecting on calm water, misty pine forest, photorealistic, cinematic"`
+    image:     `사용자가 입력한 내용을 분석하여, FLUX 이미지 생성 모델에 최적화된 영어 프롬프트를 작성해줘. 시각적으로 구체적이고 풍부한 묘사를 포함해야 해. 프롬프트 텍스트만 출력해. 다른 설명, 따옴표, 머릿말은 절대 쓰지 마. 예시 형식: "a serene mountain lake at sunrise, golden light reflecting on calm water, misty pine forest, photorealistic, cinematic"`,
+    audio:     `주어진 텍스트(또는 이미지의 텍스트)를 ${langName}로 번역하거나 처리해줘. ${toneName}를 사용해. 음성으로 읽기 좋게 자연스러운 문장으로 작성해. 텍스트만 출력해.`
   };
 
   return prompts[format] || prompts.translate;
@@ -473,7 +544,7 @@ function spawnNode(parentId, x, y, inheritInput) {
   return id;
 }
 
-const FORMAT_LABELS = { translate: '번역', explain: '설명', summarize: '요약', bullets: '불릿', rewrite: '재작성', image: '이미지' };
+const FORMAT_LABELS = { translate: '번역', explain: '설명', summarize: '요약', bullets: '불릿', rewrite: '재작성', image: '이미지', audio: '음성' };
 
 function renderNodeCard(data) {
   const { id, x, y, input, format, tone, lang, output } = data;
@@ -503,6 +574,7 @@ function renderNodeCard(data) {
           <option value="bullets"   ${format==='bullets'  ?'selected':''}>불릿</option>
           <option value="rewrite"   ${format==='rewrite'  ?'selected':''}>재작성</option>
           <option value="image"     ${format==='image'    ?'selected':''}>이미지</option>
+          <option value="audio"     ${format==='audio'    ?'selected':''}>음성</option>
         </select>
         <select class="node-select" data-sel="${id}" data-field="tone">
           <option value="neutral" ${tone==='neutral'?'selected':''}>중립</option>
@@ -659,6 +731,14 @@ async function runNodeTranslate(id) {
       img.src = buildPollinationsUrl(result);
       outEl.innerHTML = '';
       outEl.appendChild(img);
+    } else if (d.format === 'audio') {
+      outEl.className = 'node-output';
+      const voice = { ko: 'nova', ja: 'shimmer', zh: 'shimmer', es: 'alloy', en: 'alloy' }[d.lang] || 'nova';
+      const audioUrl = 'https://text.pollinations.ai/' +
+        encodeURIComponent(result.slice(0, 800)) +
+        '?model=openai-audio&voice=' + voice;
+      outEl.innerHTML = `<p style="font-size:12px;line-height:1.6;margin-bottom:8px">${escHtml(result)}</p>
+        <audio controls preload="auto" style="width:100%;height:32px;border-radius:6px;accent-color:var(--primary)" src="${audioUrl}"></audio>`;
     } else {
       outEl.textContent = result;
       outEl.className = 'node-output';

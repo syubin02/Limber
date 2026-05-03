@@ -83,6 +83,12 @@
       <div class="panel-header">
         <span class="panel-label">Output</span>
         <div class="output-actions">
+          <button class="icon-btn speak-btn" id="speak-btn" title="읽어주기" disabled>
+            <svg id="speak-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2 5h2.5L8 2v10L4.5 9H2V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+              <path d="M10 4.5a3 3 0 010 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </button>
           <button class="icon-btn" id="copy-output" title="복사">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
@@ -106,6 +112,7 @@
           <option value="bullets">불릿포인트</option>
           <option value="rewrite">재작성</option>
           <option value="image">이미지 생성</option>
+          <option value="audio">음성 생성</option>
         </select>
         <select id="out-tone" class="ctrl-select" aria-label="말투" id="out-tone-wrap">
           <option value="neutral">중립</option>
@@ -127,6 +134,18 @@
         <div class="output-image-wrap" id="output-image-wrap" hidden>
           <img id="output-image" src="" alt="생성된 이미지">
           <p class="output-image-prompt" id="output-image-prompt"></p>
+        </div>
+        <div class="output-audio-wrap" id="output-audio-wrap" hidden>
+          <div class="output-audio-text" id="output-audio-text"></div>
+          <div class="audio-player-row">
+            <div class="audio-generating" id="audio-generating" hidden>
+              <div class="audio-wave">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <span class="audio-generating-label">음성 생성 중...</span>
+            </div>
+            <audio id="audio-player" controls preload="auto" hidden></audio>
+          </div>
         </div>
         <div class="image-loading" id="image-loading" hidden aria-live="polite">
           <div class="image-loading-inner">
