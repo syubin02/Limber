@@ -7,6 +7,10 @@ let splitOutputText = '';
 let accessPassword = '';
 let activeThreeCleanup = null;
 
+const API_BASE_URL = window.location.protocol === 'file:'
+  ? 'https://limber-steel.vercel.app'
+  : '';
+
 const TONE_INPUT_LABELS = {
   neutral: '중립',
   formal: '격식체',
@@ -144,6 +148,10 @@ function apiHeaders(extra) {
   const password = getAccessPassword();
   if (password) headers['X-Limber-Password'] = password;
   return headers;
+}
+
+function apiUrl(path) {
+  return API_BASE_URL + path;
 }
 
 async function assertApiOk(res) {
@@ -525,7 +533,7 @@ async function showSplitImage(prompt) {
   translateBtn.disabled    = true;
 
   try {
-    const res = await fetch('/api/generate-image', {
+    const res = await fetch(apiUrl('/api/generate-image'), {
       method: 'POST',
       headers: apiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ prompt }),
@@ -578,7 +586,7 @@ async function showSplitAudio(text) {
   speakBtn.disabled           = false;
 
   try {
-    const res = await fetch('/api/generate-audio', {
+    const res = await fetch(apiUrl('/api/generate-audio'), {
       method: 'POST',
       headers: apiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ text, lang: outLang.value }),
@@ -893,7 +901,7 @@ async function showSplitVideo(prompt) {
   startVideoTimer();
 
   try {
-    const startRes = await fetch('/api/generate-video', {
+    const startRes = await fetch(apiUrl('/api/generate-video'), {
       method: 'POST',
       headers: apiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ prompt }),
@@ -904,7 +912,7 @@ async function showSplitVideo(prompt) {
     const deadline = Date.now() + 10 * 60 * 1000;
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 5000));
-      const statusRes = await fetch(`/api/video-status?id=${encodeURIComponent(id)}`, {
+      const statusRes = await fetch(apiUrl(`/api/video-status?id=${encodeURIComponent(id)}`), {
         headers: apiHeaders(),
       });
       await assertApiOk(statusRes);
@@ -933,7 +941,7 @@ async function showSplitVideo(prompt) {
 }
 
 async function fetchVideoObjectUrl(id) {
-  const res = await fetch(`/api/video-content?id=${encodeURIComponent(id)}`, {
+  const res = await fetch(apiUrl(`/api/video-content?id=${encodeURIComponent(id)}`), {
     headers: apiHeaders(),
   });
   await assertApiOk(res);
@@ -955,7 +963,7 @@ async function downloadImage(src) {
 
 // ===== API =====
 async function callChat({ text, imageBase64, imageType, format, tone, lang, customStyle }) {
-  const res = await fetch('/api/chat', {
+  const res = await fetch(apiUrl('/api/chat'), {
     method: 'POST',
     headers: apiHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ text, imageBase64, imageType, format, tone, lang, customStyle }),
@@ -1230,7 +1238,7 @@ async function runNodeTranslate(id) {
     } else if (d.format === 'image') {
       outEl.className = 'node-output';
       outEl.textContent = '이미지 생성 중...';
-      const imgRes = await fetch('/api/generate-image', {
+      const imgRes = await fetch(apiUrl('/api/generate-image'), {
         method: 'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ prompt: result }),
@@ -1246,7 +1254,7 @@ async function runNodeTranslate(id) {
     } else if (d.format === 'audio') {
       outEl.className = 'node-output';
       outEl.textContent = '음성 생성 중...';
-      const audioRes = await fetch('/api/generate-audio', {
+      const audioRes = await fetch(apiUrl('/api/generate-audio'), {
         method: 'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ text: result, lang: d.lang }),
@@ -1259,7 +1267,7 @@ async function runNodeTranslate(id) {
     } else if (d.format === 'video') {
       outEl.className   = 'node-output';
       outEl.textContent = '동영상 생성 중... (2–5분 소요)';
-      const startRes = await fetch('/api/generate-video', {
+      const startRes = await fetch(apiUrl('/api/generate-video'), {
         method: 'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ prompt: result }),
@@ -1271,7 +1279,7 @@ async function runNodeTranslate(id) {
       let completed = false;
       while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 5000));
-        const statusRes = await fetch(`/api/video-status?id=${encodeURIComponent(jobId)}`, {
+        const statusRes = await fetch(apiUrl(`/api/video-status?id=${encodeURIComponent(jobId)}`), {
           headers: apiHeaders(),
         });
         await assertApiOk(statusRes);
