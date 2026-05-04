@@ -1371,8 +1371,14 @@ function renderNodeCard(data) {
       </button>
     </div>
     <div class="node-body">
-      <textarea class="node-textarea" data-ta="${id}" placeholder="텍스트 입력 또는 이미지 드래그" spellcheck="false">${escHtml(input)}</textarea>
-      <div class="node-output ${output ? '' : 'is-empty'}" id="no-${id}">${output ? escHtml(output) : '번역 결과가 여기에 표시됩니다'}</div>
+      <div class="node-section node-section-input">
+        <div class="node-section-label">입력 노드</div>
+        <textarea class="node-textarea" data-ta="${id}" placeholder="텍스트 입력 또는 이미지 드래그" spellcheck="false">${escHtml(input)}</textarea>
+      </div>
+      <div class="node-section node-section-result">
+        <div class="node-section-label">결과 노드</div>
+        <div class="node-output ${output ? '' : 'is-empty'}" id="no-${id}">${output ? escHtml(output) : '결과가 여기에 표시됩니다'}</div>
+      </div>
       <input type="text" class="node-custom-style" data-cst="${id}" placeholder="말투 직접 입력 (예: 오은영 말투, ISTP 말투)">
       <div class="node-selects">
         <select class="node-select" data-sel="${id}" data-field="format">
