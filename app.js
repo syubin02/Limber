@@ -1397,7 +1397,7 @@ function renderNodeCard(data) {
           </select>
         </div>
         <div class="node-actions">
-          <button class="node-btn node-btn-translate" data-tr="${id}">변환</button>
+          <button class="node-btn node-btn-translate" data-tr="${id}">번역</button>
         </div>
       </div>
     </div>
@@ -1615,7 +1615,7 @@ async function runNodeTranslate(id) {
     showToast('번역 오류: ' + (err.message || ''));
   } finally {
     trBtn.disabled = false;
-    trBtn.textContent = '변환';
+    trBtn.textContent = '번역';
   }
 }
 
