@@ -437,8 +437,10 @@ function bindSplitTranslate() {
         await showSplitAudio(result);
       } else if (fmt === 'video') {
         await showSplitVideo(result);
-      } else if (fmt === 'object3d' || fmt === 'space') {
-        showSplitThree(result, fmt);
+      } else if (fmt === 'object3d') {
+        await showSplitGeneratedObject(result);
+      } else if (fmt === 'space') {
+        await showSplitGeneratedSpace(result);
       } else {
         splitOutputText = result;
         showSplitOutput(result);
@@ -632,6 +634,83 @@ function showSplitThree(rawSpec, mode) {
     : renderObjectScene(outputThreeView, spec);
 }
 
+async function showSplitGeneratedObject(prompt) {
+  prepareThreeLoading('실제 3D 오브젝트 생성 중', 'Meshy가 GLB 모델을 만들고 있습니다. 보통 몇 분 정도 소요됩니다.');
+  try {
+    const startRes = await fetch(apiUrl('/api/generate-3d'), {
+      method: 'POST',
+      headers: apiHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ prompt }),
+    });
+    await assertApiOk(startRes);
+    const { id } = await startRes.json();
+
+    const deadline = Date.now() + 12 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 6000));
+      const statusRes = await fetch(apiUrl(`/api/3d-status?id=${encodeURIComponent(id)}`), {
+        headers: apiHeaders(),
+      });
+      await assertApiOk(statusRes);
+      const status = await statusRes.json();
+
+      outputThreeHint.textContent = `3D 생성 중... ${Math.max(0, status.progress || 0)}%`;
+      if (status.status === 'SUCCEEDED' && status.url) {
+        outputThreeTitle.textContent = '3D 오브젝트';
+        outputThreeHint.textContent = '드래그로 회전, 휠로 확대/축소';
+        clearThreeOutput();
+        activeThreeCleanup = renderGlbObject(outputThreeView, status.url);
+        translateBtn.disabled = false;
+        return;
+      }
+      if (status.status === 'FAILED') throw new Error(status.error || '3D 생성 실패');
+    }
+    throw new Error('시간 초과 (12분)');
+  } catch (err) {
+    translateBtn.disabled = false;
+    outputThreeHint.textContent = err.message || '3D 생성 오류';
+    showToast('3D 생성 오류: ' + (err.message || ''));
+  }
+}
+
+async function showSplitGeneratedSpace(prompt) {
+  prepareThreeLoading('360 공간 생성 중', '이미지 모델이 파노라마 공간을 만들고 있습니다.');
+  try {
+    const res = await fetch(apiUrl('/api/generate-image'), {
+      method: 'POST',
+      headers: apiHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ prompt }),
+    });
+    await assertApiOk(res);
+    const { url } = await res.json();
+    outputThreeTitle.textContent = '공간';
+    outputThreeHint.textContent = '드래그로 좌우상하 둘러보기';
+    clearThreeOutput();
+    activeThreeCleanup = renderPanoramaImage(outputThreeView, url);
+    translateBtn.disabled = false;
+  } catch (err) {
+    translateBtn.disabled = false;
+    outputThreeHint.textContent = err.message || '공간 생성 오류';
+    showToast('공간 생성 오류: ' + (err.message || ''));
+  }
+}
+
+function prepareThreeLoading(title, hint) {
+  setSplitLoading(false);
+  outputPlaceholder.hidden = true;
+  outputText.hidden        = true;
+  outputImageWrap.hidden   = true;
+  outputAudioWrap.hidden   = true;
+  outputVideoWrap.hidden   = true;
+  outputThreeWrap.hidden   = false;
+  speakBtn.disabled        = true;
+  translateBtn.disabled    = true;
+  clearThreeOutput();
+  outputThreeView.innerHTML = '<div class="three-loading"><div class="image-spinner"></div></div>';
+  outputThreeTitle.textContent = title;
+  outputThreeHint.textContent = hint;
+}
+
 function clearThreeOutput() {
   if (activeThreeCleanup) {
     activeThreeCleanup();
@@ -722,6 +801,85 @@ function renderSpaceScene(container, spec) {
   scene.add(sphere);
 
   return runThreeViewport(container, renderer, scene, camera, sphere, { panorama: true });
+}
+
+function renderPanoramaImage(container, url) {
+  const { THREE } = window;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 100);
+  camera.position.set(0, 0, 0.01);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  container.appendChild(renderer.domElement);
+
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(35, 64, 32),
+    new THREE.MeshBasicMaterial({ color: 0x111111, side: THREE.BackSide }),
+  );
+  scene.add(sphere);
+
+  const loader = new THREE.TextureLoader();
+  loader.setCrossOrigin('anonymous');
+  loader.load(url, texture => {
+    if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    if (THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding;
+    sphere.material.map = texture;
+    sphere.material.color.setHex(0xffffff);
+    sphere.material.needsUpdate = true;
+  }, undefined, () => {
+    outputThreeHint.textContent = '파노라마 이미지를 3D 텍스처로 불러오지 못했습니다.';
+  });
+
+  return runThreeViewport(container, renderer, scene, camera, sphere, { panorama: true });
+}
+
+function renderGlbObject(container, url) {
+  const { THREE } = window;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  camera.position.set(0, 0.8, 6);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  container.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const key = new THREE.DirectionalLight(0xffffff, 1.8);
+  key.position.set(3, 5, 4);
+  scene.add(key);
+  const fill = new THREE.PointLight(0xff6100, 1.4, 10);
+  fill.position.set(-3, 2, 3);
+  scene.add(fill);
+
+  const group = new THREE.Group();
+  scene.add(group);
+
+  const grid = new THREE.GridHelper(4, 12, 0xff6100, 0x333333);
+  grid.position.y = -1.25;
+  scene.add(grid);
+
+  const loader = new THREE.GLTFLoader();
+  loader.load(url, gltf => {
+    const model = gltf.scene;
+    normalizeModel(model);
+    group.add(model);
+  }, undefined, () => {
+    outputThreeHint.textContent = 'GLB 모델을 불러오지 못했습니다.';
+  });
+
+  return runThreeViewport(container, renderer, scene, camera, group, { orbit: true });
+}
+
+function normalizeModel(model) {
+  const { THREE } = window;
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const scale = 2.6 / maxDim;
+  model.position.sub(center);
+  model.scale.setScalar(scale);
 }
 
 function makeThreeMaterial(spec) {

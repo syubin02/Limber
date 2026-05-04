@@ -754,6 +754,13 @@ audio#audio-player {
   display: block;
 }
 
+.three-loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .three-caption {
   display: flex;
   align-items: center;
