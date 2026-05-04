@@ -27,23 +27,26 @@ const TONE_INPUT_VALUES = {
 };
 
 const FORMAT_INPUT_VALUES = {
-  translate: 'translate',
-  explain: 'explain',
-  summarize: 'summarize',
-  bullets: 'bullets',
-  rewrite: 'rewrite',
+  text: 'text',
   image: 'image',
   audio: 'audio',
   video: 'video',
   object3d: 'object3d',
   space: 'space',
-  '번역': 'translate',
-  '설명': 'explain',
-  '설명/해석': 'explain',
-  '요약': 'summarize',
-  '불릿': 'bullets',
-  '불릿포인트': 'bullets',
-  '재작성': 'rewrite',
+  translate: 'text',
+  explain: 'text',
+  summarize: 'text',
+  bullets: 'text',
+  rewrite: 'text',
+  '텍스트': 'text',
+  '텍스트 생성': 'text',
+  '번역': 'text',
+  '설명': 'text',
+  '설명/해석': 'text',
+  '요약': 'text',
+  '불릿': 'text',
+  '불릿포인트': 'text',
+  '재작성': 'text',
   '이미지': 'image',
   '이미지 생성': 'image',
   '음성': 'audio',
@@ -57,11 +60,7 @@ const FORMAT_INPUT_VALUES = {
 
 const CONTROL_LABELS = {
   format: {
-    translate: '번역',
-    explain: '설명/해석',
-    summarize: '요약',
-    bullets: '불릿포인트',
-    rewrite: '재작성',
+    text: '텍스트 생성',
     image: '이미지 생성',
     audio: '음성 생성',
     video: '동영상 생성',
@@ -235,7 +234,7 @@ function hideAuthGate() {
 
 // ===== SETTINGS PERSISTENCE =====
 function loadPersistedSettings() {
-  const fmt  = localStorage.getItem('limber_format') || 'translate';
+  const fmt  = normalizeStoredFormat(localStorage.getItem('limber_format') || 'text');
   const tone = localStorage.getItem('limber_tone')   || 'neutral';
   const lang = localStorage.getItem('limber_lang')   || 'ko';
 
@@ -290,7 +289,7 @@ function bindSettingsPanel() {
 }
 
 function formatInputValue(format) {
-  return CONTROL_LABELS.format[format] || format || CONTROL_LABELS.format.translate;
+  return CONTROL_LABELS.format[normalizeStoredFormat(format)] || format || CONTROL_LABELS.format.text;
 }
 
 function resolveFormatInput(value) {
@@ -298,6 +297,10 @@ function resolveFormatInput(value) {
   const format = FORMAT_INPUT_VALUES[raw];
   if (format) return { format, customFormat: '' };
   return { format: 'custom', customFormat: raw };
+}
+
+function normalizeStoredFormat(format) {
+  return FORMAT_INPUT_VALUES[format] || format || 'text';
 }
 
 function bindFormatMenu() {
@@ -1336,7 +1339,7 @@ function spawnNode(parentId, x, y, inheritInput) {
     x, y,
     input:  inheritInput || '',
     image:  { base64: null, type: null },
-    format: localStorage.getItem('limber_format') || 'translate',
+    format: normalizeStoredFormat(localStorage.getItem('limber_format') || 'text'),
     tone:   localStorage.getItem('limber_tone')   || 'neutral',
     lang:   localStorage.getItem('limber_lang')   || 'ko',
     output: '',
@@ -1348,7 +1351,7 @@ function spawnNode(parentId, x, y, inheritInput) {
   return id;
 }
 
-const FORMAT_LABELS = { translate: '번역', explain: '설명', summarize: '요약', bullets: '불릿', rewrite: '재작성', image: '이미지', audio: '음성', video: '동영상', object3d: '3D', space: '공간' };
+const FORMAT_LABELS = { text: '텍스트 생성', image: '이미지', audio: '음성', video: '동영상', object3d: '3D', space: '공간' };
 
 function renderNodeCard(data) {
   const { id, x, y, input, format, tone, lang, output } = data;
@@ -1373,11 +1376,7 @@ function renderNodeCard(data) {
       <input type="text" class="node-custom-style" data-cst="${id}" placeholder="말투 직접 입력 (예: 오은영 말투, ISTP 말투)">
       <div class="node-selects">
         <select class="node-select" data-sel="${id}" data-field="format">
-          <option value="translate" ${format==='translate'?'selected':''}>번역</option>
-          <option value="explain"   ${format==='explain'  ?'selected':''}>설명</option>
-          <option value="summarize" ${format==='summarize'?'selected':''}>요약</option>
-          <option value="bullets"   ${format==='bullets'  ?'selected':''}>불릿</option>
-          <option value="rewrite"   ${format==='rewrite'  ?'selected':''}>재작성</option>
+          <option value="text"      ${format==='text'     ?'selected':''}>텍스트 생성</option>
           <option value="image"     ${format==='image'    ?'selected':''}>이미지</option>
           <option value="audio"     ${format==='audio'    ?'selected':''}>음성</option>
           <option value="video"     ${format==='video'    ?'selected':''}>동영상</option>
@@ -1462,7 +1461,7 @@ function attachNodeEvents(card, id) {
     if (!d) return;
     d[sel.dataset.field] = sel.value;
     if (sel.dataset.field === 'format') {
-      document.getElementById('nb-' + id).textContent = FORMAT_LABELS[sel.value];
+      document.getElementById('nb-' + id).textContent = FORMAT_LABELS[sel.value] || sel.value;
     }
   });
 

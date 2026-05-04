@@ -13,6 +13,7 @@ function buildSystemPrompt(format, tone, lang, customStyle, customFormat) {
     : `${toneName}를 사용해.`;
 
   const prompts = {
+    text:      `주어진 텍스트(또는 이미지의 텍스트)를 ${langName}로 자연스럽게 생성/변환해줘. 사용자가 입력한 목적이 번역, 설명, 요약, 불릿포인트, 재작성 중 무엇에 가까운지 판단해서 가장 알맞은 텍스트 결과를 만들어. ${toneInstruction} 결과물만 출력해.`,
     translate: `주어진 텍스트(또는 이미지의 텍스트)를 ${langName}로 번역해줘. ${toneInstruction} 번역문만 출력해.`,
     explain:   `주어진 텍스트(또는 이미지)를 ${langName}로 상세히 설명하고 해석해줘. ${toneInstruction} 핵심 개념과 맥락을 포함해.`,
     summarize: `주어진 텍스트(또는 이미지의 텍스트)의 핵심을 ${langName}로 간결하게 요약해줘. ${toneInstruction}`,
@@ -26,7 +27,7 @@ function buildSystemPrompt(format, tone, lang, customStyle, customFormat) {
     custom:    `주어진 텍스트(또는 이미지의 텍스트)를 ${langName}로 처리하되, 출력 형태는 사용자가 지정한 "${customFormat || '자유 형식'}"에 맞춰 작성해줘. ${toneInstruction} 결과물만 출력하고 불필요한 설명은 쓰지 마.`,
   };
 
-  return prompts[format] || prompts.translate;
+  return prompts[format] || prompts.text;
 }
 
 module.exports = async function handler(req, res) {
@@ -58,7 +59,7 @@ module.exports = async function handler(req, res) {
         model: 'gpt-4o',
         max_tokens: 2048,
         messages: [
-          { role: 'system', content: buildSystemPrompt(format || 'translate', tone || 'neutral', lang || 'ko', customStyle || '', customFormat || '') },
+          { role: 'system', content: buildSystemPrompt(format || 'text', tone || 'neutral', lang || 'ko', customStyle || '', customFormat || '') },
           { role: 'user', content: userContent },
         ],
       }),
