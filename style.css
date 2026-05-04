@@ -478,6 +478,7 @@ select, textarea, input {
 }
 
 .select-menu,
+.format-combo .select-menu,
 .tone-menu {
   position: absolute;
   top: calc(100% + 5px);
@@ -519,12 +520,21 @@ select, textarea, input {
   display: flex;
 }
 
+.format-combo {
+  position: relative;
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+}
+
+.format-combo .ctrl-format,
 .tone-combo .ctrl-tone {
   flex: 1;
   min-width: 0;
   padding-right: 34px;
 }
 
+.format-menu-btn,
 .tone-menu-btn {
   position: absolute;
   top: 1px;
@@ -542,10 +552,18 @@ select, textarea, input {
   transition: color 150ms var(--ease), background 150ms var(--ease);
 }
 
+.format-menu-btn:hover,
+.format-menu-btn[aria-expanded="true"],
 .tone-menu-btn:hover,
 .tone-menu-btn[aria-expanded="true"] {
   color: var(--text);
   background: rgba(255, 255, 255, 0.04);
+}
+
+.ctrl-format {
+  flex: 1;
+  min-width: 120px;
+  width: auto;
 }
 
 .ctrl-tone {

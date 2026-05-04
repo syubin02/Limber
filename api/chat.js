@@ -1,6 +1,6 @@
 const { requireAccess } = require('./auth');
 
-function buildSystemPrompt(format, tone, lang, customStyle) {
+function buildSystemPrompt(format, tone, lang, customStyle, customFormat) {
   const langName = { ko: '한국어', en: 'English', ja: '日本語', zh: '中文', es: 'Español' }[lang] || lang;
   const toneName = {
     neutral: '중립적이고 자연스러운 문체',
@@ -23,6 +23,7 @@ function buildSystemPrompt(format, tone, lang, customStyle) {
     video:     `사용자가 입력한 내용을 분석하여, Sora 동영상 생성 모델에 최적화된 영어 프롬프트를 작성해줘. 동적인 카메라 움직임, 조명, 분위기를 구체적으로 묘사해야 해. 프롬프트 텍스트만 출력해. 다른 설명, 따옴표, 머릿말은 절대 쓰지 마.`,
     object3d:  `사용자가 입력한 내용을 text-to-3D 모델에 넣을 영어 프롬프트로 변환해줘. 오브젝트의 실제 형태, 구조, 주요 부품, 재질, 비율, 스타일을 구체적으로 써. 배경이나 카메라 설명은 빼고 오브젝트만 묘사해. 프롬프트 텍스트만 출력해. 다른 설명, 따옴표, 머릿말은 절대 쓰지 마.`,
     space:     `사용자가 입력한 내용을 360도 equirectangular panorama 이미지 생성 모델에 넣을 영어 프롬프트로 변환해줘. 실내/실외 공간 구조, 바닥, 천장/하늘, 전후좌우로 이어지는 환경, 조명, 분위기를 구체적으로 묘사하고 "seamless 360 equirectangular panorama, full spherical environment, 2:1 aspect ratio"를 포함해. 프롬프트 텍스트만 출력해. 다른 설명, 따옴표, 머릿말은 절대 쓰지 마.`,
+    custom:    `주어진 텍스트(또는 이미지의 텍스트)를 ${langName}로 처리하되, 출력 형태는 사용자가 지정한 "${customFormat || '자유 형식'}"에 맞춰 작성해줘. ${toneInstruction} 결과물만 출력하고 불필요한 설명은 쓰지 마.`,
   };
 
   return prompts[format] || prompts.translate;
@@ -36,7 +37,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireAccess(req, res)) return;
 
-  const { text, imageBase64, imageType, format, tone, lang, customStyle } = req.body || {};
+  const { text, imageBase64, imageType, format, customFormat, tone, lang, customStyle } = req.body || {};
   if (!text && !imageBase64) return res.status(400).json({ error: 'text or imageBase64 required' });
 
   const userContent = imageBase64
@@ -57,7 +58,7 @@ module.exports = async function handler(req, res) {
         model: 'gpt-4o',
         max_tokens: 2048,
         messages: [
-          { role: 'system', content: buildSystemPrompt(format || 'translate', tone || 'neutral', lang || 'ko', customStyle || '') },
+          { role: 'system', content: buildSystemPrompt(format || 'translate', tone || 'neutral', lang || 'ko', customStyle || '', customFormat || '') },
           { role: 'user', content: userContent },
         ],
       }),

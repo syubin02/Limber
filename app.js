@@ -26,6 +26,35 @@ const TONE_INPUT_VALUES = {
   '구어체': 'casual',
 };
 
+const FORMAT_INPUT_VALUES = {
+  translate: 'translate',
+  explain: 'explain',
+  summarize: 'summarize',
+  bullets: 'bullets',
+  rewrite: 'rewrite',
+  image: 'image',
+  audio: 'audio',
+  video: 'video',
+  object3d: 'object3d',
+  space: 'space',
+  '번역': 'translate',
+  '설명': 'explain',
+  '설명/해석': 'explain',
+  '요약': 'summarize',
+  '불릿': 'bullets',
+  '불릿포인트': 'bullets',
+  '재작성': 'rewrite',
+  '이미지': 'image',
+  '이미지 생성': 'image',
+  '음성': 'audio',
+  '음성 생성': 'audio',
+  '동영상': 'video',
+  '동영상 생성': 'video',
+  '3D': 'object3d',
+  '3D 오브젝트': 'object3d',
+  '공간': 'space',
+};
+
 const CONTROL_LABELS = {
   format: {
     translate: '번역',
@@ -80,6 +109,7 @@ const removeImage      = $('remove-image');
 const clearInput       = $('clear-input');
 const translateBtn     = $('translate-btn');
 const outFormat        = $('out-format');
+const formatCombo      = $('format-combo');
 const outFormatBtn     = $('out-format-btn');
 const outFormatMenu    = $('out-format-menu');
 const outTone          = $('out-tone');
@@ -128,7 +158,7 @@ function init() {
   loadPersistedSettings();
   bindModeToggle();
   bindSettingsPanel();
-  bindCustomSelect(outFormat, outFormatBtn, outFormatMenu, CONTROL_LABELS.format);
+  bindFormatMenu();
   bindCustomSelect(outLang, outLangBtn, outLangMenu, CONTROL_LABELS.lang);
   bindToneMenu();
   bindSplitInput();
@@ -209,7 +239,7 @@ function loadPersistedSettings() {
   const tone = localStorage.getItem('limber_tone')   || 'neutral';
   const lang = localStorage.getItem('limber_lang')   || 'ko';
 
-  setCustomSelectValue(outFormat, outFormatBtn, CONTROL_LABELS.format, fmt);
+  outFormat.value = formatInputValue(fmt);
   outTone.value   = toneInputValue(tone);
   setCustomSelectValue(outLang, outLangBtn, CONTROL_LABELS.lang, lang);
   if (defaultFormat) defaultFormat.value = fmt;
@@ -242,7 +272,7 @@ function bindSettingsPanel() {
   if (defaultFormat) {
     defaultFormat.addEventListener('change', () => {
       localStorage.setItem('limber_format', defaultFormat.value);
-      setCustomSelectValue(outFormat, outFormatBtn, CONTROL_LABELS.format, defaultFormat.value);
+      outFormat.value = formatInputValue(defaultFormat.value);
     });
   }
   if (defaultTone) {
@@ -257,6 +287,49 @@ function bindSettingsPanel() {
       setCustomSelectValue(outLang, outLangBtn, CONTROL_LABELS.lang, defaultLang.value);
     });
   }
+}
+
+function formatInputValue(format) {
+  return CONTROL_LABELS.format[format] || format || CONTROL_LABELS.format.translate;
+}
+
+function resolveFormatInput(value) {
+  const raw = value.trim();
+  const format = FORMAT_INPUT_VALUES[raw];
+  if (format) return { format, customFormat: '' };
+  return { format: 'custom', customFormat: raw };
+}
+
+function bindFormatMenu() {
+  if (!outFormatBtn || !outFormatMenu || !formatCombo) return;
+
+  outFormatBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleFormatMenu(true);
+    outFormat.focus();
+  });
+
+  outFormatMenu.addEventListener('click', e => {
+    const option = e.target.closest('[data-select-value]');
+    if (!option) return;
+    outFormat.value = formatInputValue(option.dataset.selectValue);
+    toggleFormatMenu(false);
+    outFormat.focus();
+  });
+
+  outFormat.addEventListener('focus', () => toggleFormatMenu(true));
+  outFormat.addEventListener('keydown', e => {
+    if (e.key === 'Escape') toggleFormatMenu(false);
+  });
+
+  document.addEventListener('click', e => {
+    if (!formatCombo.contains(e.target)) toggleFormatMenu(false);
+  });
+}
+
+function toggleFormatMenu(open) {
+  outFormatMenu.hidden = !open;
+  outFormatBtn.setAttribute('aria-expanded', String(open));
 }
 
 function bindCustomSelect(input, button, menu, labels) {
@@ -419,13 +492,15 @@ function bindSplitTranslate() {
 
     setSplitLoading(true);
     try {
-      const fmt = outFormat.value;
+      const formatPayload = resolveFormatInput(outFormat.value);
+      const fmt = formatPayload.format;
       const tonePayload = resolveToneInput(outTone.value);
       const result = await callChat({
         text,
         imageBase64: splitImage.base64,
         imageType:   splitImage.type,
         format: fmt,
+        customFormat: formatPayload.customFormat,
         tone:   tonePayload.tone,
         lang:   outLang.value,
         customStyle: tonePayload.customStyle,
@@ -458,7 +533,7 @@ function bindSplitTranslate() {
   });
 
   downloadOutput.addEventListener('click', () => {
-    if (outFormat.value === 'image') {
+    if (resolveFormatInput(outFormat.value).format === 'image') {
       downloadImage(outputImageEl.src);
     } else if (splitOutputText) {
       triggerDownload(splitOutputText, 'limber-output.txt');
@@ -1183,11 +1258,11 @@ async function downloadImage(src) {
 }
 
 // ===== API =====
-async function callChat({ text, imageBase64, imageType, format, tone, lang, customStyle }) {
+async function callChat({ text, imageBase64, imageType, format, customFormat, tone, lang, customStyle }) {
   const res = await fetch(apiUrl('/api/chat'), {
     method: 'POST',
     headers: apiHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ text, imageBase64, imageType, format, tone, lang, customStyle }),
+    body: JSON.stringify({ text, imageBase64, imageType, format, customFormat, tone, lang, customStyle }),
   });
   await assertApiOk(res);
   const data = await res.json();
