@@ -759,6 +759,52 @@ audio#audio-player {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 28px;
+}
+
+.three-loading-panel {
+  width: min(100%, 360px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  text-align: center;
+}
+
+.three-loading-status {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.three-progress-track {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.three-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  box-shadow: 0 0 18px rgba(255, 97, 0, 0.45);
+  transition: width 350ms var(--ease);
+}
+
+.three-progress-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.three-loading-detail {
+  max-width: 320px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-dim);
 }
 
 .three-caption {

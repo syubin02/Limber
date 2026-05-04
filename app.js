@@ -635,7 +635,8 @@ function showSplitThree(rawSpec, mode) {
 }
 
 async function showSplitGeneratedObject(prompt) {
-  prepareThreeLoading('실제 3D 오브젝트 생성 중', 'Meshy가 GLB 모델을 만들고 있습니다. 보통 몇 분 정도 소요됩니다.');
+  const progress = prepareThreeLoading('실제 3D 오브젝트 생성 중', 'Meshy가 GLB 모델을 만들고 있습니다. 보통 3-8분 정도 소요됩니다.');
+  progress.update({ percent: 2, status: '작업 요청 준비 중', detail: '프롬프트를 3D 생성 서버로 보내고 있습니다.' });
   try {
     const startRes = await fetch(apiUrl('/api/generate-3d'), {
       method: 'POST',
@@ -644,6 +645,7 @@ async function showSplitGeneratedObject(prompt) {
     });
     await assertApiOk(startRes);
     const { id } = await startRes.json();
+    progress.update({ percent: 5, status: '작업 접수 완료', detail: `작업 ID ${String(id).slice(0, 8)}... 대기열에 들어갔습니다.` });
 
     const deadline = Date.now() + 12 * 60 * 1000;
     while (Date.now() < deadline) {
@@ -654,8 +656,13 @@ async function showSplitGeneratedObject(prompt) {
       await assertApiOk(statusRes);
       const status = await statusRes.json();
 
-      outputThreeHint.textContent = `3D 생성 중... ${Math.max(0, status.progress || 0)}%`;
+      progress.update({
+        percent: Math.max(5, Math.min(99, status.progress || 0)),
+        status: formatMeshyStatus(status.status),
+        detail: '형태 생성, 텍스처 구성, GLB 패키징을 순서대로 처리 중입니다.',
+      });
       if (status.status === 'SUCCEEDED' && status.url) {
+        progress.update({ percent: 100, status: 'GLB 모델 준비 완료', detail: '브라우저 렌더러로 불러오는 중입니다.' });
         outputThreeTitle.textContent = '3D 오브젝트';
         outputThreeHint.textContent = '드래그로 회전, 휠로 확대/축소';
         clearThreeOutput();
@@ -668,13 +675,15 @@ async function showSplitGeneratedObject(prompt) {
     throw new Error('시간 초과 (12분)');
   } catch (err) {
     translateBtn.disabled = false;
+    progress.fail(err.message || '3D 생성 오류');
     outputThreeHint.textContent = err.message || '3D 생성 오류';
     showToast('3D 생성 오류: ' + (err.message || ''));
   }
 }
 
 async function showSplitGeneratedSpace(prompt) {
-  prepareThreeLoading('360 공간 생성 중', '이미지 모델이 파노라마 공간을 만들고 있습니다.');
+  const progress = prepareThreeLoading('360 공간 생성 중', '이미지 모델이 파노라마 공간을 만들고 있습니다.');
+  progress.update({ percent: 15, status: '파노라마 생성 요청 중', detail: '360도 공간 텍스처를 만들고 있습니다.' });
   try {
     const res = await fetch(apiUrl('/api/generate-image'), {
       method: 'POST',
@@ -683,6 +692,7 @@ async function showSplitGeneratedSpace(prompt) {
     });
     await assertApiOk(res);
     const { url } = await res.json();
+    progress.update({ percent: 90, status: '공간 이미지 준비 완료', detail: '3D 파노라마 구에 텍스처를 입히는 중입니다.' });
     outputThreeTitle.textContent = '공간';
     outputThreeHint.textContent = '드래그로 좌우상하 둘러보기';
     clearThreeOutput();
@@ -690,6 +700,7 @@ async function showSplitGeneratedSpace(prompt) {
     translateBtn.disabled = false;
   } catch (err) {
     translateBtn.disabled = false;
+    progress.fail(err.message || '공간 생성 오류');
     outputThreeHint.textContent = err.message || '공간 생성 오류';
     showToast('공간 생성 오류: ' + (err.message || ''));
   }
@@ -706,9 +717,61 @@ function prepareThreeLoading(title, hint) {
   speakBtn.disabled        = true;
   translateBtn.disabled    = true;
   clearThreeOutput();
-  outputThreeView.innerHTML = '<div class="three-loading"><div class="image-spinner"></div></div>';
+  outputThreeView.innerHTML = `
+    <div class="three-loading">
+      <div class="three-loading-panel">
+        <div class="image-spinner"></div>
+        <p class="three-loading-status">준비 중</p>
+        <div class="three-progress-track">
+          <div class="three-progress-bar" style="width:0%"></div>
+        </div>
+        <p class="three-progress-meta">0% · 0:00 경과</p>
+        <p class="three-loading-detail">생성 작업을 준비하고 있습니다.</p>
+      </div>
+    </div>`;
   outputThreeTitle.textContent = title;
   outputThreeHint.textContent = hint;
+  return makeThreeProgressController();
+}
+
+function makeThreeProgressController() {
+  const startedAt = Date.now();
+  const statusEl = outputThreeView.querySelector('.three-loading-status');
+  const barEl = outputThreeView.querySelector('.three-progress-bar');
+  const metaEl = outputThreeView.querySelector('.three-progress-meta');
+  const detailEl = outputThreeView.querySelector('.three-loading-detail');
+
+  function elapsed() {
+    const s = Math.floor((Date.now() - startedAt) / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  return {
+    update({ percent, status, detail }) {
+      const value = Math.max(0, Math.min(100, Math.round(percent || 0)));
+      if (statusEl && status) statusEl.textContent = status;
+      if (barEl) barEl.style.width = `${value}%`;
+      if (metaEl) metaEl.textContent = `${value}% · ${elapsed()} 경과`;
+      if (detailEl && detail) detailEl.textContent = detail;
+      outputThreeHint.textContent = `${status || '생성 중'} · ${value}% · ${elapsed()} 경과`;
+    },
+    fail(message) {
+      if (statusEl) statusEl.textContent = '생성 실패';
+      if (detailEl) detailEl.textContent = message;
+      if (barEl) barEl.style.width = '100%';
+      if (metaEl) metaEl.textContent = `중단됨 · ${elapsed()} 경과`;
+    },
+  };
+}
+
+function formatMeshyStatus(status) {
+  return {
+    PENDING: '대기열에서 순서 기다리는 중',
+    IN_PROGRESS: '3D 형태 생성 중',
+    SUCCEEDED: '생성 완료',
+    FAILED: '생성 실패',
+    EXPIRED: '작업 만료',
+  }[status] || `3D 생성 중 (${status || 'processing'})`;
 }
 
 function clearThreeOutput() {
