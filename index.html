@@ -145,6 +145,8 @@
             <button type="button" data-select-value="image">이미지 생성</button>
             <button type="button" data-select-value="audio">음성 생성</button>
             <button type="button" data-select-value="video">동영상 생성</button>
+            <button type="button" data-select-value="object3d">3D 오브젝트</button>
+            <button type="button" data-select-value="space">공간</button>
           </div>
         </div>
         <div class="tone-combo" id="tone-combo">
@@ -210,6 +212,13 @@
         <div class="output-video-wrap" id="output-video-wrap" hidden>
           <video id="output-video" controls playsinline></video>
           <p class="output-image-prompt" id="output-video-prompt"></p>
+        </div>
+        <div class="output-three-wrap" id="output-three-wrap" hidden>
+          <div class="three-viewport" id="output-three-view"></div>
+          <div class="three-caption">
+            <p class="three-title" id="output-three-title"></p>
+            <p class="three-hint" id="output-three-hint">드래그로 둘러보기</p>
+          </div>
         </div>
         <div class="video-loading" id="video-loading" hidden aria-live="polite">
           <div class="image-loading-inner">
@@ -293,6 +302,8 @@
           <option value="image">이미지 생성</option>
           <option value="audio">음성 생성</option>
           <option value="video">동영상 생성</option>
+          <option value="object3d">3D 오브젝트</option>
+          <option value="space">공간</option>
         </select>
       </div>
 
@@ -321,6 +332,7 @@
   <!-- Toast -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -21,6 +21,8 @@ function buildSystemPrompt(format, tone, lang, customStyle) {
     image:     `사용자가 입력한 내용을 분석하여, DALL-E 3 이미지 생성 모델에 최적화된 영어 프롬프트를 작성해줘. 시각적으로 구체적이고 풍부한 묘사를 포함해야 해. 프롬프트 텍스트만 출력해. 다른 설명, 따옴표, 머릿말은 절대 쓰지 마.`,
     audio:     `주어진 텍스트(또는 이미지의 텍스트)를 ${langName}로 번역하거나 처리해줘. ${toneInstruction} 음성으로 읽기 좋게 자연스러운 문장으로 작성해. 텍스트만 출력해.`,
     video:     `사용자가 입력한 내용을 분석하여, Sora 동영상 생성 모델에 최적화된 영어 프롬프트를 작성해줘. 동적인 카메라 움직임, 조명, 분위기를 구체적으로 묘사해야 해. 프롬프트 텍스트만 출력해. 다른 설명, 따옴표, 머릿말은 절대 쓰지 마.`,
+    object3d:  `사용자가 입력한 내용을 하나의 인터랙티브 3D 오브젝트 사양으로 변환해줘. JSON만 출력해. 형식: {"title":"짧은 ${langName} 제목","shape":"sphere|box|torus|crystal|tower|vehicle","colors":["#hex","#hex","#hex"],"material":"matte|metal|glass|neon","mood":"짧은 ${langName} 설명"}. 다른 설명, 마크다운, 코드블록은 절대 쓰지 마.`,
+    space:     `사용자가 입력한 내용을 좌우상하로 둘러볼 수 있는 360도 공간 사양으로 변환해줘. JSON만 출력해. 형식: {"title":"짧은 ${langName} 제목","sky":"night|sunset|dawn|studio|forest|ocean|city","horizon":"짧은 ${langName} 수평선 설명","colors":["#hex","#hex","#hex","#hex"],"mood":"짧은 ${langName} 설명"}. 다른 설명, 마크다운, 코드블록은 절대 쓰지 마.`,
   };
 
   return prompts[format] || prompts.translate;

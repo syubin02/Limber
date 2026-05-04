@@ -5,6 +5,7 @@ let currentMode = 'split';
 let splitImage = { base64: null, type: null };
 let splitOutputText = '';
 let accessPassword = '';
+let activeThreeCleanup = null;
 
 const TONE_INPUT_LABELS = {
   neutral: '중립',
@@ -31,6 +32,8 @@ const CONTROL_LABELS = {
     image: '이미지 생성',
     audio: '음성 생성',
     video: '동영상 생성',
+    object3d: '3D 오브젝트',
+    space: '공간',
   },
   lang: {
     ko: '한국어',
@@ -91,6 +94,10 @@ const imageLoading     = $('image-loading');
 const outputVideoWrap  = $('output-video-wrap');
 const outputVideoEl    = $('output-video');
 const outputVideoPrompt= $('output-video-prompt');
+const outputThreeWrap  = $('output-three-wrap');
+const outputThreeView  = $('output-three-view');
+const outputThreeTitle = $('output-three-title');
+const outputThreeHint  = $('output-three-hint');
 const videoLoading     = $('video-loading');
 const videoElapsed     = $('video-elapsed');
 const outputAudioWrap  = $('output-audio-wrap');
@@ -422,6 +429,8 @@ function bindSplitTranslate() {
         await showSplitAudio(result);
       } else if (fmt === 'video') {
         await showSplitVideo(result);
+      } else if (fmt === 'object3d' || fmt === 'space') {
+        showSplitThree(result, fmt);
       } else {
         splitOutputText = result;
         showSplitOutput(result);
@@ -456,8 +465,10 @@ function setSplitLoading(on) {
     outputImageWrap.hidden = true;
     outputAudioWrap.hidden = true;
     outputVideoWrap.hidden = true;
+    outputThreeWrap.hidden = true;
     imageLoading.hidden    = true;
     videoLoading.hidden    = true;
+    clearThreeOutput();
     speakBtn.disabled      = true;
     stopSpeaking();
     stopVideoTimer();
@@ -472,6 +483,8 @@ function showSplitOutput(text) {
   outputImageWrap.hidden = true;
   outputAudioWrap.hidden = true;
   outputVideoWrap.hidden = true;
+  outputThreeWrap.hidden = true;
+  clearThreeOutput();
   speakBtn.disabled      = false;
 }
 
@@ -505,6 +518,8 @@ async function showSplitImage(prompt) {
   skeletonWrap.hidden      = true;
   outputText.hidden        = true;
   outputImageWrap.hidden   = true;
+  outputThreeWrap.hidden   = true;
+  clearThreeOutput();
   outputPlaceholder.hidden = true;
   imageLoading.hidden      = false;
   translateBtn.disabled    = true;
@@ -554,6 +569,8 @@ async function showSplitAudio(text) {
   outputText.hidden        = true;
   outputImageWrap.hidden   = true;
   outputVideoWrap.hidden   = true;
+  outputThreeWrap.hidden   = true;
+  clearThreeOutput();
   outputAudioText.textContent = text;
   outputAudioWrap.hidden      = false;
   audioGenerating.hidden      = false;
@@ -579,6 +596,275 @@ async function showSplitAudio(text) {
   }
 }
 
+// ===== 3D / SPACE OUTPUT (Three.js) =====
+function showSplitThree(rawSpec, mode) {
+  setSplitLoading(false);
+  outputPlaceholder.hidden = true;
+  outputText.hidden        = true;
+  outputImageWrap.hidden   = true;
+  outputAudioWrap.hidden   = true;
+  outputVideoWrap.hidden   = true;
+  outputThreeWrap.hidden   = false;
+  speakBtn.disabled        = true;
+
+  const spec = parseSceneSpec(rawSpec, mode);
+  outputThreeTitle.textContent = spec.title || (mode === 'space' ? '공간' : '3D 오브젝트');
+  outputThreeHint.textContent = mode === 'space'
+    ? '드래그로 좌우상하 둘러보기'
+    : '드래그로 회전, 휠로 확대/축소';
+
+  clearThreeOutput();
+  if (!window.THREE) {
+    outputThreeView.textContent = '3D 렌더러를 불러오지 못했습니다.';
+    return;
+  }
+
+  activeThreeCleanup = mode === 'space'
+    ? renderSpaceScene(outputThreeView, spec)
+    : renderObjectScene(outputThreeView, spec);
+}
+
+function clearThreeOutput() {
+  if (activeThreeCleanup) {
+    activeThreeCleanup();
+    activeThreeCleanup = null;
+  }
+  if (outputThreeView) outputThreeView.innerHTML = '';
+}
+
+function parseSceneSpec(raw, mode) {
+  const fallback = {
+    title: mode === 'space' ? '상상 공간' : '상상 오브젝트',
+    shape: 'crystal',
+    sky: 'sunset',
+    colors: ['#ff6100', '#f0ece8', '#4f9cff', '#111111'],
+    material: 'metal',
+    mood: '',
+  };
+  try {
+    const clean = String(raw).replace(/^```json\s*|\s*```$/g, '').trim();
+    const parsed = JSON.parse(clean);
+    return Object.assign(fallback, parsed, {
+      colors: Array.isArray(parsed.colors) && parsed.colors.length ? parsed.colors.slice(0, 5) : fallback.colors,
+    });
+  } catch {
+    return fallback;
+  }
+}
+
+function renderObjectScene(container, spec) {
+  const { THREE } = window;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  camera.position.set(0, 0.6, 6);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  container.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+  const key = new THREE.DirectionalLight(0xffffff, 1.6);
+  key.position.set(3, 4, 5);
+  scene.add(key);
+  const rim = new THREE.PointLight(normalizeColor(spec.colors[2]), 2.2, 12);
+  rim.position.set(-3, 2, 3);
+  scene.add(rim);
+
+  const group = new THREE.Group();
+  scene.add(group);
+  const material = makeThreeMaterial(spec);
+  const geometry = makeObjectGeometry(spec.shape);
+  const main = new THREE.Mesh(geometry, material);
+  group.add(main);
+
+  const accentMaterial = new THREE.MeshStandardMaterial({
+    color: normalizeColor(spec.colors[1]),
+    metalness: 0.35,
+    roughness: 0.28,
+    emissive: normalizeColor(spec.colors[2]),
+    emissiveIntensity: spec.material === 'neon' ? 0.25 : 0.04,
+  });
+  for (let i = 0; i < 6; i++) {
+    const bead = new THREE.Mesh(new THREE.SphereGeometry(0.09, 18, 18), accentMaterial);
+    const angle = (Math.PI * 2 * i) / 6;
+    bead.position.set(Math.cos(angle) * 1.55, Math.sin(angle * 2) * 0.32, Math.sin(angle) * 1.55);
+    group.add(bead);
+  }
+
+  return runThreeViewport(container, renderer, scene, camera, group, { orbit: true });
+}
+
+function renderSpaceScene(container, spec) {
+  const { THREE } = window;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 100);
+  camera.position.set(0, 0, 0.01);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  container.appendChild(renderer.domElement);
+
+  const texture = new THREE.CanvasTexture(makePanoramaCanvas(spec));
+  if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+  if (THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding;
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(35, 64, 32),
+    new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide }),
+  );
+  scene.add(sphere);
+
+  return runThreeViewport(container, renderer, scene, camera, sphere, { panorama: true });
+}
+
+function makeThreeMaterial(spec) {
+  const { THREE } = window;
+  const base = normalizeColor(spec.colors[0]);
+  const material = spec.material || 'metal';
+  return new THREE.MeshStandardMaterial({
+    color: base,
+    metalness: material === 'metal' ? 0.75 : material === 'glass' ? 0.05 : 0.25,
+    roughness: material === 'matte' ? 0.7 : 0.24,
+    transparent: material === 'glass',
+    opacity: material === 'glass' ? 0.72 : 1,
+    emissive: material === 'neon' ? base : '#000000',
+    emissiveIntensity: material === 'neon' ? 0.25 : 0,
+  });
+}
+
+function makeObjectGeometry(shape) {
+  const { THREE } = window;
+  const kind = String(shape || '').toLowerCase();
+  if (kind === 'sphere') return new THREE.SphereGeometry(1.25, 48, 32);
+  if (kind === 'box') return new THREE.BoxGeometry(1.8, 1.8, 1.8, 5, 5, 5);
+  if (kind === 'torus') return new THREE.TorusKnotGeometry(0.9, 0.28, 140, 18);
+  if (kind === 'tower') return new THREE.ConeGeometry(0.85, 2.5, 6, 4);
+  if (kind === 'vehicle') return new THREE.CapsuleGeometry(0.72, 1.2, 8, 24);
+  return new THREE.IcosahedronGeometry(1.35, 1);
+}
+
+function runThreeViewport(container, renderer, scene, camera, subject, options) {
+  let raf = 0;
+  let dragging = false;
+  let last = { x: 0, y: 0 };
+  let yaw = 0;
+  let pitch = 0;
+  let distance = 6;
+  let autoSpin = 0;
+
+  function resize() {
+    const rect = container.getBoundingClientRect();
+    renderer.setSize(rect.width, rect.height, false);
+    camera.aspect = rect.width / Math.max(rect.height, 1);
+    camera.updateProjectionMatrix();
+  }
+
+  function onPointerDown(e) {
+    dragging = true;
+    last = { x: e.clientX, y: e.clientY };
+    container.setPointerCapture(e.pointerId);
+  }
+  function onPointerMove(e) {
+    if (!dragging) return;
+    const dx = e.clientX - last.x;
+    const dy = e.clientY - last.y;
+    last = { x: e.clientX, y: e.clientY };
+    yaw += dx * 0.008;
+    pitch = Math.max(-1.2, Math.min(1.2, pitch + dy * 0.006));
+  }
+  function onPointerUp(e) {
+    dragging = false;
+    if (container.hasPointerCapture(e.pointerId)) container.releasePointerCapture(e.pointerId);
+  }
+  function onWheel(e) {
+    if (!options.orbit) return;
+    e.preventDefault();
+    distance = Math.max(3.2, Math.min(9, distance + e.deltaY * 0.006));
+  }
+  function animate() {
+    if (options.panorama) {
+      camera.rotation.order = 'YXZ';
+      camera.rotation.y = -yaw;
+      camera.rotation.x = -pitch;
+    } else {
+      autoSpin += 0.006;
+      subject.rotation.x = pitch;
+      subject.rotation.y = autoSpin + yaw;
+      camera.position.z = distance;
+    }
+    renderer.render(scene, camera);
+    raf = requestAnimationFrame(animate);
+  }
+
+  resize();
+  container.addEventListener('pointerdown', onPointerDown);
+  container.addEventListener('pointermove', onPointerMove);
+  container.addEventListener('pointerup', onPointerUp);
+  container.addEventListener('pointercancel', onPointerUp);
+  container.addEventListener('wheel', onWheel, { passive: false });
+  window.addEventListener('resize', resize);
+  animate();
+
+  return () => {
+    cancelAnimationFrame(raf);
+    container.removeEventListener('pointerdown', onPointerDown);
+    container.removeEventListener('pointermove', onPointerMove);
+    container.removeEventListener('pointerup', onPointerUp);
+    container.removeEventListener('pointercancel', onPointerUp);
+    container.removeEventListener('wheel', onWheel);
+    window.removeEventListener('resize', resize);
+    renderer.dispose();
+  };
+}
+
+function makePanoramaCanvas(spec) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2048;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+  const colors = spec.colors || ['#10121f', '#ff8a3d', '#4f9cff', '#050505'];
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, normalizeColor(colors[0]));
+  grad.addColorStop(0.52, normalizeColor(colors[1] || colors[0]));
+  grad.addColorStop(1, normalizeColor(colors[3] || '#070707'));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const horizonY = canvas.height * 0.58;
+  ctx.fillStyle = hexToRgba(colors[2] || '#ffffff', 0.18);
+  for (let i = 0; i < 9; i++) {
+    const x = i * 260 - 80;
+    const h = 90 + (i % 4) * 42;
+    ctx.fillRect(x, horizonY - h, 180, h);
+  }
+  ctx.fillStyle = hexToRgba('#ffffff', spec.sky === 'night' ? 0.75 : 0.28);
+  for (let i = 0; i < 180; i++) {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height * 0.46;
+    const r = Math.random() * 2.2 + 0.5;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = hexToRgba(colors[1] || '#ff6100', 0.65);
+  ctx.beginPath();
+  ctx.arc(canvas.width * 0.72, canvas.height * 0.32, 86, 0, Math.PI * 2);
+  ctx.fill();
+  return canvas;
+}
+
+function normalizeColor(value) {
+  const color = String(value || '#ff6100').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : '#ff6100';
+}
+
+function hexToRgba(hex, alpha) {
+  const safe = normalizeColor(hex).slice(1);
+  const r = parseInt(safe.slice(0, 2), 16);
+  const g = parseInt(safe.slice(2, 4), 16);
+  const b = parseInt(safe.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 // ===== VIDEO OUTPUT (Sora 2) =====
 let videoTimerId = null;
 
@@ -600,6 +886,8 @@ async function showSplitVideo(prompt) {
   skeletonWrap.hidden      = true;
   outputPlaceholder.hidden = true;
   outputVideoWrap.hidden   = true;
+  outputThreeWrap.hidden   = true;
+  clearThreeOutput();
   videoLoading.hidden      = false;
   translateBtn.disabled    = true;
   startVideoTimer();
@@ -756,7 +1044,7 @@ function spawnNode(parentId, x, y, inheritInput) {
   return id;
 }
 
-const FORMAT_LABELS = { translate: '번역', explain: '설명', summarize: '요약', bullets: '불릿', rewrite: '재작성', image: '이미지', audio: '음성', video: '동영상' };
+const FORMAT_LABELS = { translate: '번역', explain: '설명', summarize: '요약', bullets: '불릿', rewrite: '재작성', image: '이미지', audio: '음성', video: '동영상', object3d: '3D', space: '공간' };
 
 function renderNodeCard(data) {
   const { id, x, y, input, format, tone, lang, output } = data;
@@ -789,6 +1077,8 @@ function renderNodeCard(data) {
           <option value="image"     ${format==='image'    ?'selected':''}>이미지</option>
           <option value="audio"     ${format==='audio'    ?'selected':''}>음성</option>
           <option value="video"     ${format==='video'    ?'selected':''}>동영상</option>
+          <option value="object3d"  ${format==='object3d' ?'selected':''}>3D</option>
+          <option value="space"     ${format==='space'    ?'selected':''}>공간</option>
         </select>
         <select class="node-select" data-sel="${id}" data-field="tone">
           <option value="neutral" ${tone==='neutral'?'selected':''}>중립</option>
@@ -933,7 +1223,11 @@ async function runNodeTranslate(id) {
     });
     d.output = result;
 
-    if (d.format === 'image') {
+    if (d.format === 'object3d' || d.format === 'space') {
+      const spec = parseSceneSpec(result, d.format);
+      outEl.textContent = `${spec.title}\n${spec.mood || 'Split 뷰에서 인터랙티브 3D로 확인할 수 있습니다.'}`;
+      outEl.className = 'node-output';
+    } else if (d.format === 'image') {
       outEl.className = 'node-output';
       outEl.textContent = '이미지 생성 중...';
       const imgRes = await fetch('/api/generate-image', {
