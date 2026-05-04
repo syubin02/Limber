@@ -1357,60 +1357,70 @@ function renderNodeCard(data) {
   const { id, x, y, input, format, tone, lang, output } = data;
 
   const card = document.createElement('div');
-  card.className = 'node-card';
+  card.className = 'node-card node-pair';
   card.id = 'nc-' + id;
   card.style.cssText = `left:${x}px;top:${y}px`;
 
   card.innerHTML = `
-    <div class="node-header" data-drag="${id}">
-      <span class="node-badge" id="nb-${id}">${FORMAT_LABELS[format]}</span>
-      <button class="node-close-btn" data-close="${id}" title="삭제">
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <path d="M8 2L2 8M2 2l6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </button>
-    </div>
-    <div class="node-body">
-      <div class="node-section node-section-input">
-        <div class="node-section-label">입력 노드</div>
-        <textarea class="node-textarea" data-ta="${id}" placeholder="텍스트 입력 또는 이미지 드래그" spellcheck="false">${escHtml(input)}</textarea>
-      </div>
-      <div class="node-section node-section-result">
-        <div class="node-section-label">결과 노드</div>
-        <div class="node-output ${output ? '' : 'is-empty'}" id="no-${id}">${output ? escHtml(output) : '결과가 여기에 표시됩니다'}</div>
-      </div>
-      <input type="text" class="node-custom-style" data-cst="${id}" placeholder="말투 직접 입력 (예: 오은영 말투, ISTP 말투)">
-      <div class="node-selects">
-        <select class="node-select" data-sel="${id}" data-field="format">
-          <option value="text"      ${format==='text'     ?'selected':''}>텍스트 생성</option>
-          <option value="image"     ${format==='image'    ?'selected':''}>이미지</option>
-          <option value="audio"     ${format==='audio'    ?'selected':''}>음성</option>
-          <option value="video"     ${format==='video'    ?'selected':''}>동영상</option>
-          <option value="object3d"  ${format==='object3d' ?'selected':''}>3D</option>
-          <option value="space"     ${format==='space'    ?'selected':''}>공간</option>
-        </select>
-        <select class="node-select" data-sel="${id}" data-field="tone">
-          <option value="neutral" ${tone==='neutral'?'selected':''}>중립</option>
-          <option value="formal"  ${tone==='formal' ?'selected':''}>격식체</option>
-          <option value="casual"  ${tone==='casual' ?'selected':''}>구어체</option>
-        </select>
-        <select class="node-select" data-sel="${id}" data-field="lang">
-          <option value="ko" ${lang==='ko'?'selected':''}>KO</option>
-          <option value="en" ${lang==='en'?'selected':''}>EN</option>
-          <option value="ja" ${lang==='ja'?'selected':''}>JA</option>
-          <option value="zh" ${lang==='zh'?'selected':''}>ZH</option>
-          <option value="es" ${lang==='es'?'selected':''}>ES</option>
-        </select>
-      </div>
-      <div class="node-actions">
-        <button class="node-btn node-btn-translate" data-tr="${id}">변환</button>
-        <button class="node-btn node-btn-branch"    data-br="${id}">Branch +</button>
-        <button class="node-btn node-btn-copy" data-cp="${id}" title="복사">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <rect x="4" y="4" width="7" height="7" rx="1.2" stroke="currentColor" stroke-width="1.3"/>
-            <path d="M8 4V2.5A.5.5 0 007.5 2h-5a.5.5 0 00-.5.5v5a.5.5 0 00.5.5H4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+    <div class="node-subcard node-input-card">
+      <div class="node-header" data-drag="${id}">
+        <span class="node-kind">Input</span>
+        <button class="node-close-btn" data-close="${id}" title="삭제">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M8 2L2 8M2 2l6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </button>
+      </div>
+      <div class="node-body">
+        <textarea class="node-textarea" data-ta="${id}" placeholder="텍스트 입력 또는 이미지 드래그" spellcheck="false">${escHtml(input)}</textarea>
+        <input type="text" class="node-custom-style" data-cst="${id}" placeholder="말투 직접 입력 (예: 오은영 말투, ISTP 말투)">
+        <div class="node-selects">
+          <select class="node-select" data-sel="${id}" data-field="format">
+            <option value="text"      ${format==='text'     ?'selected':''}>텍스트 생성</option>
+            <option value="image"     ${format==='image'    ?'selected':''}>이미지</option>
+            <option value="audio"     ${format==='audio'    ?'selected':''}>음성</option>
+            <option value="video"     ${format==='video'    ?'selected':''}>동영상</option>
+            <option value="object3d"  ${format==='object3d' ?'selected':''}>3D</option>
+            <option value="space"     ${format==='space'    ?'selected':''}>공간</option>
+          </select>
+          <select class="node-select" data-sel="${id}" data-field="tone">
+            <option value="neutral" ${tone==='neutral'?'selected':''}>중립</option>
+            <option value="formal"  ${tone==='formal' ?'selected':''}>격식체</option>
+            <option value="casual"  ${tone==='casual' ?'selected':''}>구어체</option>
+          </select>
+          <select class="node-select" data-sel="${id}" data-field="lang">
+            <option value="ko" ${lang==='ko'?'selected':''}>KO</option>
+            <option value="en" ${lang==='en'?'selected':''}>EN</option>
+            <option value="ja" ${lang==='ja'?'selected':''}>JA</option>
+            <option value="zh" ${lang==='zh'?'selected':''}>ZH</option>
+            <option value="es" ${lang==='es'?'selected':''}>ES</option>
+          </select>
+        </div>
+        <div class="node-actions">
+          <button class="node-btn node-btn-translate" data-tr="${id}">변환</button>
+        </div>
+      </div>
+    </div>
+    <div class="node-link" aria-hidden="true">
+      <span class="node-port node-port-output"></span>
+      <span class="node-link-line"></span>
+      <span class="node-port node-port-input"></span>
+    </div>
+    <div class="node-subcard node-result-card">
+      <div class="node-header" data-drag="${id}">
+        <span class="node-badge" id="nb-${id}">${FORMAT_LABELS[format]}</span>
+      </div>
+      <div class="node-body">
+        <div class="node-output ${output ? '' : 'is-empty'}" id="no-${id}">${output ? escHtml(output) : '결과가 여기에 표시됩니다'}</div>
+        <div class="node-actions">
+          <button class="node-btn node-btn-branch" data-br="${id}">Branch +</button>
+          <button class="node-btn node-btn-copy" data-cp="${id}" title="복사">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="4" y="4" width="7" height="7" rx="1.2" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M8 4V2.5A.5.5 0 007.5 2h-5a.5.5 0 00-.5.5v5a.5.5 0 00.5.5H4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>`;
 
@@ -1614,7 +1624,7 @@ function branchFromNode(parentId) {
   const parent = nodeMap.get(parentId);
   if (!parent) return;
   const sibCount = [...nodeMap.values()].filter(n => n.parentId === parentId).length;
-  spawnNode(parentId, parent.x + 340, parent.y + 180 + sibCount * 80, parent.output || '');
+  spawnNode(parentId, parent.x + 780, parent.y + sibCount * 220, parent.output || '');
 }
 
 // ===== NODE DELETE =====
@@ -1639,10 +1649,10 @@ function redrawConnections() {
     const parentCard = document.getElementById('nc-' + nd.parentId);
     const childCard  = document.getElementById('nc-' + nd.id);
     if (!parentCard || !childCard) return;
-    const pBot = cardEdgePoint(parent, parentCard, 'bottom');
-    const cTop = cardEdgePoint(nd, childCard, 'top');
-    const dy   = Math.abs(cTop.y - pBot.y) * 0.5;
-    const pathD = `M${pBot.x},${pBot.y} C${pBot.x},${pBot.y + dy} ${cTop.x},${cTop.y - dy} ${cTop.x},${cTop.y}`;
+    const pOut = cardEdgePoint(parent, parentCard, 'right');
+    const cIn  = cardEdgePoint(nd, childCard, 'left');
+    const dx   = Math.max(120, Math.abs(cIn.x - pOut.x) * 0.45);
+    const pathD = `M${pOut.x},${pOut.y} C${pOut.x + dx},${pOut.y} ${cIn.x - dx},${cIn.y} ${cIn.x},${cIn.y}`;
     const path  = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', pathD);
     path.setAttribute('class', 'conn-path');
@@ -1656,9 +1666,10 @@ function cardEdgePoint(nd, card, edge) {
   const h = card.offsetHeight;
   const ax = nd.x * s + tx;
   const ay = nd.y * s + ty;
-  return edge === 'bottom'
-    ? { x: ax + (w / 2) * s, y: ay + h * s }
-    : { x: ax + (w / 2) * s, y: ay };
+  if (edge === 'right') return { x: ax + w * s, y: ay + (h / 2) * s };
+  if (edge === 'left') return { x: ax, y: ay + (h / 2) * s };
+  if (edge === 'bottom') return { x: ax + (w / 2) * s, y: ay + h * s };
+  return { x: ax + (w / 2) * s, y: ay };
 }
 
 // ===== EMPTY STATE =====

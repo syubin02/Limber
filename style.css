@@ -1099,14 +1099,12 @@ audio#audio-player {
 /* ===== NODE CARD ===== */
 .node-card {
   position: absolute;
-  width: 310px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
+  width: 700px;
+  display: grid;
+  grid-template-columns: 310px 70px 320px;
+  align-items: start;
   user-select: none;
   animation: nodeIn 200ms var(--ease-spring) both;
-  transition: box-shadow 150ms var(--ease), border-color 150ms var(--ease);
 }
 
 @keyframes nodeIn {
@@ -1115,13 +1113,76 @@ audio#audio-player {
 }
 
 .node-card:hover {
+  z-index: 20;
+}
+
+.node-card.is-dragging {
+  z-index: 50;
+}
+
+.node-card.is-dragging .node-subcard {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65);
+}
+
+.node-subcard {
+  min-height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: box-shadow 150ms var(--ease), border-color 150ms var(--ease);
+}
+
+.node-subcard:hover {
   border-color: rgba(255, 97, 0, 0.2);
   box-shadow: var(--shadow), 0 0 0 1px rgba(255, 97, 0, 0.12);
 }
 
-.node-card.is-dragging {
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65);
-  z-index: 50;
+.node-input-card {
+  border-color: rgba(116, 151, 190, 0.2);
+}
+
+.node-result-card {
+  border-color: rgba(255, 97, 0, 0.18);
+}
+
+.node-link {
+  position: relative;
+  height: 120px;
+  margin-top: 72px;
+}
+
+.node-link-line {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  right: 11px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(151, 185, 224, 0.58), rgba(255, 97, 0, 0.72));
+  transform: translateY(-50%);
+}
+
+.node-port {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  background: var(--bg);
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.node-port-output {
+  left: 0;
+  color: rgba(151, 185, 224, 0.9);
+}
+
+.node-port-input {
+  right: 0;
+  color: rgba(255, 123, 74, 0.95);
 }
 
 /* Node header (drag handle) */
@@ -1147,6 +1208,12 @@ audio#audio-player {
   background: var(--primary-dim);
   padding: 3px 8px;
   border-radius: 5px;
+}
+
+.node-kind {
+  font-size: 11px;
+  font-weight: 750;
+  color: var(--text);
 }
 
 .node-close-btn {
@@ -1175,46 +1242,10 @@ audio#audio-player {
   gap: 9px;
 }
 
-.node-section {
-  position: relative;
-  padding: 24px 9px 9px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.node-section-label {
-  position: absolute;
-  top: 7px;
-  left: 10px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.9px;
-  color: var(--text-muted);
-}
-
-.node-section-input {
-  border-color: rgba(116, 151, 190, 0.28);
-  background: rgba(72, 122, 180, 0.08);
-}
-
-.node-section-input .node-section-label {
-  color: rgba(151, 185, 224, 0.86);
-}
-
-.node-section-result {
-  border-color: rgba(255, 97, 0, 0.2);
-  background: rgba(255, 97, 0, 0.055);
-}
-
-.node-section-result .node-section-label {
-  color: rgba(255, 123, 74, 0.92);
-}
-
 .node-textarea {
   width: 100%;
-  min-height: 72px;
-  max-height: 150px;
+  min-height: 176px;
+  max-height: 260px;
   padding: 9px 11px;
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid var(--border);
@@ -1232,7 +1263,9 @@ audio#audio-player {
 }
 
 .node-output {
-  min-height: 56px;
+  min-height: 176px;
+  max-height: 360px;
+  overflow: auto;
   padding: 9px 11px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 97, 0, 0.16);
