@@ -1012,7 +1012,7 @@ function renderGlbReady(container, url, thumbnailUrl) {
   previewBtn.addEventListener('click', () => {
     outputThreeHint.textContent = 'GLB 모델을 불러오는 중입니다. 무거운 모델은 시간이 걸릴 수 있습니다.';
     clearThreeOutput();
-    activeThreeCleanup = renderGlbObject(container, url);
+    activeThreeCleanup = renderGlbObject(container, modelProxyUrl(url));
   });
 
   const downloadLink = document.createElement('a');
@@ -1026,6 +1026,10 @@ function renderGlbReady(container, url, thumbnailUrl) {
   body.append(title, note, actions);
   wrap.appendChild(body);
   container.replaceChildren(wrap);
+}
+
+function modelProxyUrl(url) {
+  return apiUrl(`/api/3d-model?url=${encodeURIComponent(url)}`);
 }
 
 function renderGlbObject(container, url) {
@@ -1077,16 +1081,20 @@ let gltfLoaderPromise = null;
 
 async function loadGlbModel(url) {
   const Loader = await getGltfLoader();
+  const res = await fetch(url, {
+    headers: apiHeaders(),
+  });
+  await assertApiOk(res);
+  const buffer = await res.arrayBuffer();
   return new Promise((resolve, reject) => {
     const loader = new Loader();
-    loader.setCrossOrigin?.('anonymous');
-    loader.load(url, gltf => {
+    loader.parse(buffer, '', gltf => {
       if (!gltf.scene) {
         reject(new Error('GLB 파일 안에서 3D 씬을 찾지 못했습니다.'));
         return;
       }
       resolve(gltf.scene);
-    }, undefined, err => {
+    }, err => {
       reject(new Error(err?.message || 'GLB 모델을 불러오지 못했습니다.'));
     });
   });
