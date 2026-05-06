@@ -743,11 +743,11 @@ async function showSplitGeneratedObject(prompt) {
         throw new Error('Meshy 생성은 완료됐지만 GLB 파일 URL을 받지 못했습니다. 다시 시도해주세요.');
       }
       if (status.status === 'SUCCEEDED' && status.url) {
-        progress.update({ percent: 100, status: 'GLB 모델 준비 완료', detail: '브라우저 렌더러로 불러오는 중입니다.' });
+        progress.update({ percent: 100, status: 'GLB 모델 준비 완료', detail: '모델 파일이 준비됐습니다.' });
         outputThreeTitle.textContent = '3D 오브젝트';
-        outputThreeHint.textContent = '드래그로 회전, 휠로 확대/축소';
+        outputThreeHint.textContent = '모델이 무거울 수 있어 자동 로드는 하지 않습니다.';
         clearThreeOutput();
-        activeThreeCleanup = renderGlbObject(outputThreeView, status.url);
+        renderGlbReady(outputThreeView, status.url, status.thumbnailUrl);
         translateBtn.disabled = false;
         return;
       }
@@ -977,6 +977,55 @@ function renderPanoramaImage(container, url) {
   });
 
   return runThreeViewport(container, renderer, scene, camera, sphere, { panorama: true });
+}
+
+function renderGlbReady(container, url, thumbnailUrl) {
+  const wrap = document.createElement('div');
+  wrap.className = 'glb-ready';
+
+  if (thumbnailUrl) {
+    const img = document.createElement('img');
+    img.className = 'glb-ready-thumb';
+    img.src = thumbnailUrl;
+    img.alt = '생성된 3D 모델 미리보기';
+    wrap.appendChild(img);
+  }
+
+  const body = document.createElement('div');
+  body.className = 'glb-ready-body';
+
+  const title = document.createElement('p');
+  title.className = 'glb-ready-title';
+  title.textContent = '3D 모델 파일이 준비됐습니다';
+
+  const note = document.createElement('p');
+  note.className = 'glb-ready-note';
+  note.textContent = '무거운 GLB 파일은 브라우저 탭을 불안정하게 만들 수 있어 자동으로 열지 않습니다.';
+
+  const actions = document.createElement('div');
+  actions.className = 'glb-ready-actions';
+
+  const previewBtn = document.createElement('button');
+  previewBtn.type = 'button';
+  previewBtn.className = 'glb-ready-btn glb-ready-btn-primary';
+  previewBtn.textContent = '3D 미리보기';
+  previewBtn.addEventListener('click', () => {
+    outputThreeHint.textContent = 'GLB 모델을 불러오는 중입니다. 무거운 모델은 시간이 걸릴 수 있습니다.';
+    clearThreeOutput();
+    activeThreeCleanup = renderGlbObject(container, url);
+  });
+
+  const downloadLink = document.createElement('a');
+  downloadLink.className = 'glb-ready-btn';
+  downloadLink.href = url;
+  downloadLink.target = '_blank';
+  downloadLink.rel = 'noopener noreferrer';
+  downloadLink.textContent = 'GLB 열기';
+
+  actions.append(previewBtn, downloadLink);
+  body.append(title, note, actions);
+  wrap.appendChild(body);
+  container.replaceChildren(wrap);
 }
 
 function renderGlbObject(container, url) {
