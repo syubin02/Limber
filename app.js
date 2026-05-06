@@ -1004,16 +1004,48 @@ function renderGlbObject(container, url) {
   grid.position.y = -1.25;
   scene.add(grid);
 
-  const loader = new THREE.GLTFLoader();
-  loader.load(url, gltf => {
-    const model = gltf.scene;
-    normalizeModel(model);
-    group.add(model);
-  }, undefined, () => {
-    outputThreeHint.textContent = 'GLB 모델을 불러오지 못했습니다.';
-  });
+  let alive = true;
+  loadGlbModel(url)
+    .then(model => {
+      if (!alive) return;
+      normalizeModel(model);
+      group.add(model);
+    })
+    .catch(err => {
+      if (!alive) return;
+      outputThreeHint.textContent = err.message || 'GLB 모델을 불러오지 못했습니다.';
+    });
 
-  return runThreeViewport(container, renderer, scene, camera, group, { orbit: true });
+  const cleanup = runThreeViewport(container, renderer, scene, camera, group, { orbit: true });
+  return () => {
+    alive = false;
+    cleanup();
+  };
+}
+
+async function loadGlbModel(url) {
+  const Loader = await getGltfLoader();
+  return new Promise((resolve, reject) => {
+    const loader = new Loader();
+    loader.setCrossOrigin?.('anonymous');
+    loader.load(url, gltf => {
+      if (!gltf.scene) {
+        reject(new Error('GLB 파일 안에서 3D 씬을 찾지 못했습니다.'));
+        return;
+      }
+      resolve(gltf.scene);
+    }, undefined, err => {
+      reject(new Error(err?.message || 'GLB 모델을 불러오지 못했습니다.'));
+    });
+  });
+}
+
+async function getGltfLoader() {
+  if (typeof window.THREE?.GLTFLoader === 'function') return window.THREE.GLTFLoader;
+  if (typeof window.GLTFLoader === 'function') return window.GLTFLoader;
+  const module = await import('https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/loaders/GLTFLoader.js');
+  window.GLTFLoader = module.GLTFLoader;
+  return module.GLTFLoader;
 }
 
 function normalizeModel(model) {
