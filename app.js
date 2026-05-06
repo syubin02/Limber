@@ -739,6 +739,9 @@ async function showSplitGeneratedObject(prompt) {
         status: formatMeshyStatus(status.status),
         detail: '형태 생성, 텍스처 구성, GLB 패키징을 순서대로 처리 중입니다.',
       });
+      if (status.status === 'SUCCEEDED' && !status.url) {
+        throw new Error('Meshy 생성은 완료됐지만 GLB 파일 URL을 받지 못했습니다. 다시 시도해주세요.');
+      }
       if (status.status === 'SUCCEEDED' && status.url) {
         progress.update({ percent: 100, status: 'GLB 모델 준비 완료', detail: '브라우저 렌더러로 불러오는 중입니다.' });
         outputThreeTitle.textContent = '3D 오브젝트';
@@ -749,6 +752,7 @@ async function showSplitGeneratedObject(prompt) {
         return;
       }
       if (status.status === 'FAILED') throw new Error(status.error || '3D 생성 실패');
+      if (status.status === 'EXPIRED') throw new Error('Meshy 작업이 만료되었습니다. 다시 생성해주세요.');
     }
     throw new Error('시간 초과 (12분)');
   } catch (err) {
