@@ -78,6 +78,7 @@ const CONTROL_LABELS = {
 
 // Node canvas state
 const nodeMap = new Map();
+const selectedNodeIds = new Set();
 let nodeIdSeq = 0;
 let canvasTx = { x: 0, y: 0, scale: 1 };
 let isPanning = false;
@@ -145,6 +146,8 @@ const nodeCanvas       = $('node-canvas');
 const connectionsSvg   = $('connections-svg');
 const addRootNode      = $('add-root-node');
 const resetViewBtn     = $('reset-view-btn');
+const mergeNodesBtn    = $('merge-nodes-btn');
+const mergeNodesLabel  = $('merge-nodes-label');
 const nodeEmptyState   = $('node-empty-state');
 const defaultFormat    = $('default-format');
 const defaultTone      = $('default-tone');
@@ -1436,6 +1439,10 @@ function bindNodeToolbar() {
     applyCanvasTx();
     redrawConnections();
   });
+
+  if (mergeNodesBtn) {
+    mergeNodesBtn.addEventListener('click', mergeSelectedNodes);
+  }
 }
 
 // ===== NODE CREATION =====
@@ -1444,6 +1451,7 @@ function spawnNode(parentId, x, y, inheritInput) {
   const data = {
     id,
     parentId,
+    parentIds: parentId ? [parentId] : [],
     x, y,
     input:  inheritInput || '',
     image:  { base64: null, type: null },
@@ -1451,6 +1459,7 @@ function spawnNode(parentId, x, y, inheritInput) {
     tone:   localStorage.getItem('limber_tone')   || 'neutral',
     lang:   localStorage.getItem('limber_lang')   || 'ko',
     output: '',
+    kind: 'translate',
   };
   nodeMap.set(id, data);
   renderNodeCard(data);
@@ -1521,6 +1530,7 @@ function renderNodeCard(data) {
       <div class="node-body">
         <div class="node-output ${output ? '' : 'is-empty'}" id="no-${id}">${output ? escHtml(output) : '결과가 여기에 표시됩니다'}</div>
         <div class="node-actions">
+          <button class="node-btn node-btn-select" data-select-node="${id}">선택</button>
           <button class="node-btn node-btn-branch" data-br="${id}">Branch +</button>
           <button class="node-btn node-btn-copy" data-cp="${id}" title="복사">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -1572,6 +1582,7 @@ function attachNodeEvents(card, id) {
     if (e.target.closest(`[data-close="${id}"]`)) { deleteNode(id); return; }
     if (e.target.closest(`[data-tr="${id}"]`))    { runNodeTranslate(id); return; }
     if (e.target.closest(`[data-br="${id}"]`))    { branchFromNode(id); return; }
+    if (e.target.closest(`[data-select-node="${id}"]`)) { toggleNodeSelection(id); return; }
     if (e.target.closest(`[data-cp="${id}"]`))    {
       const d = nodeMap.get(id);
       if (d && d.output) navigator.clipboard.writeText(d.output).then(() => showToast('복사됨'));
@@ -1735,14 +1746,93 @@ function branchFromNode(parentId) {
   spawnNode(parentId, parent.x + 780, parent.y + sibCount * 220, parent.output || '');
 }
 
+function toggleNodeSelection(id) {
+  const node = nodeMap.get(id);
+  if (!node) return;
+  if (!node.output) {
+    showToast('결과가 있는 노드만 선택할 수 있습니다.');
+    return;
+  }
+  if (selectedNodeIds.has(id)) {
+    selectedNodeIds.delete(id);
+  } else {
+    selectedNodeIds.add(id);
+  }
+  updateNodeSelectionUI(id);
+  updateMergeToolbar();
+}
+
+function updateNodeSelectionUI(id) {
+  const card = document.getElementById('nc-' + id);
+  const btn = card ? card.querySelector(`[data-select-node="${id}"]`) : null;
+  const selected = selectedNodeIds.has(id);
+  if (card) card.classList.toggle('is-selected', selected);
+  if (btn) btn.textContent = selected ? '선택됨' : '선택';
+}
+
+function updateMergeToolbar() {
+  if (!mergeNodesBtn) return;
+  const count = selectedNodeIds.size;
+  mergeNodesBtn.disabled = count < 2;
+  if (mergeNodesLabel) mergeNodesLabel.textContent = count ? `선택 합치기 (${count})` : '선택 합치기';
+}
+
+function mergeSelectedNodes() {
+  const selected = [...selectedNodeIds]
+    .map(id => nodeMap.get(id))
+    .filter(node => node && node.output);
+  if (selected.length < 2) {
+    showToast('합칠 결과 노드를 2개 이상 선택해주세요.');
+    return;
+  }
+
+  const minX = Math.min(...selected.map(node => node.x));
+  const avgY = selected.reduce((sum, node) => sum + node.y, 0) / selected.length;
+  const maxX = Math.max(...selected.map(node => node.x));
+  const input = buildMergedInput(selected);
+  const id = spawnNode(null, maxX + 820, avgY, input);
+  const merged = nodeMap.get(id);
+  if (merged) {
+    merged.parentId = selected[0].id;
+    merged.parentIds = selected.map(node => node.id);
+    merged.kind = 'merge';
+    merged.format = 'text';
+    merged.x = Math.max(maxX + 820, minX + 820);
+    merged.y = avgY;
+    const card = document.getElementById('nc-' + id);
+    if (card) {
+      card.style.left = merged.x + 'px';
+      card.style.top = merged.y + 'px';
+      const badge = card.querySelector('#nb-' + id);
+      if (badge) badge.textContent = 'Merge';
+    }
+  }
+
+  selectedNodeIds.clear();
+  selected.forEach(node => updateNodeSelectionUI(node.id));
+  updateMergeToolbar();
+  redrawConnections();
+  showToast('선택한 결과를 새 Merge 노드로 합쳤습니다.');
+}
+
+function buildMergedInput(nodes) {
+  const parts = nodes.map((node, index) => {
+    const label = FORMAT_LABELS[node.format] || node.format || '결과';
+    return `[${index + 1}. ${label}]\n${node.output}`;
+  });
+  return `아래 결과들을 하나의 새 작업으로 합쳐줘.\n\n${parts.join('\n\n')}\n\n합성 목표:\n- 서로 다른 결과의 핵심 요소를 유지해.\n- 공간과 3D가 있으면 같은 장면 안에 배치해.\n- 이미지와 음악/음성이 있으면 분위기와 타이밍이 어울리게 결합해.`;
+}
+
 // ===== NODE DELETE =====
 function deleteNode(id) {
   const card = document.getElementById('nc-' + id);
   if (card) card.remove();
   [...nodeMap.values()]
-    .filter(n => n.parentId === id)
+    .filter(n => n.parentId === id || (Array.isArray(n.parentIds) && n.parentIds.includes(id)))
     .forEach(n => deleteNode(n.id));
+  selectedNodeIds.delete(id);
   nodeMap.delete(id);
+  updateMergeToolbar();
   updateEmptyState();
   redrawConnections();
 }
@@ -1751,20 +1841,24 @@ function deleteNode(id) {
 function redrawConnections() {
   connectionsSvg.innerHTML = '';
   nodeMap.forEach(nd => {
-    if (!nd.parentId) return;
-    const parent = nodeMap.get(nd.parentId);
-    if (!parent) return;
-    const parentCard = document.getElementById('nc-' + nd.parentId);
-    const childCard  = document.getElementById('nc-' + nd.id);
-    if (!parentCard || !childCard) return;
-    const pOut = cardEdgePoint(parent, parentCard, 'right');
-    const cIn  = cardEdgePoint(nd, childCard, 'left');
-    const dx   = Math.max(120, Math.abs(cIn.x - pOut.x) * 0.45);
-    const pathD = `M${pOut.x},${pOut.y} C${pOut.x + dx},${pOut.y} ${cIn.x - dx},${cIn.y} ${cIn.x},${cIn.y}`;
-    const path  = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', pathD);
-    path.setAttribute('class', 'conn-path');
-    connectionsSvg.appendChild(path);
+    const parentIds = Array.isArray(nd.parentIds) && nd.parentIds.length
+      ? nd.parentIds
+      : (nd.parentId ? [nd.parentId] : []);
+    parentIds.forEach(parentId => {
+      const parent = nodeMap.get(parentId);
+      if (!parent) return;
+      const parentCard = document.getElementById('nc-' + parentId);
+      const childCard  = document.getElementById('nc-' + nd.id);
+      if (!parentCard || !childCard) return;
+      const pOut = cardEdgePoint(parent, parentCard, 'right');
+      const cIn  = cardEdgePoint(nd, childCard, 'left');
+      const dx   = Math.max(120, Math.abs(cIn.x - pOut.x) * 0.45);
+      const pathD = `M${pOut.x},${pOut.y} C${pOut.x + dx},${pOut.y} ${cIn.x - dx},${cIn.y} ${cIn.x},${cIn.y}`;
+      const path  = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', pathD);
+      path.setAttribute('class', nd.kind === 'merge' ? 'conn-path conn-path-merge' : 'conn-path');
+      connectionsSvg.appendChild(path);
+    });
   });
 }
 

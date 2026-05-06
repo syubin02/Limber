@@ -1098,6 +1098,12 @@ audio#audio-player {
   border-color: var(--border-hover);
 }
 
+.toolbar-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Empty state */
 .node-empty-state {
   position: absolute;
@@ -1169,6 +1175,11 @@ audio#audio-player {
   animation: dashMove 1.2s linear infinite;
 }
 
+.conn-path-merge {
+  stroke: rgba(116, 151, 190, 0.5);
+  stroke-dasharray: 2 5;
+}
+
 @keyframes dashMove {
   to { stroke-dashoffset: -18; }
 }
@@ -1214,6 +1225,11 @@ audio#audio-player {
 .node-subcard:hover {
   border-color: rgba(255, 97, 0, 0.2);
   box-shadow: var(--shadow), 0 0 0 1px rgba(255, 97, 0, 0.12);
+}
+
+.node-card.is-selected .node-result-card {
+  border-color: rgba(116, 151, 190, 0.72);
+  box-shadow: var(--shadow), 0 0 0 2px rgba(116, 151, 190, 0.28);
 }
 
 .node-input-card {
@@ -1439,7 +1455,21 @@ audio#audio-player {
   color: var(--text);
 }
 
-.node-btn-branch:hover {
+.node-btn-select {
+  flex: 0.72;
+  background: rgba(116, 151, 190, 0.12);
+  border: 1px solid rgba(116, 151, 190, 0.28);
+  color: var(--text);
+}
+
+.node-card.is-selected .node-btn-select {
+  color: #fff;
+  background: rgba(116, 151, 190, 0.52);
+  border-color: rgba(116, 151, 190, 0.72);
+}
+
+.node-btn-branch:hover,
+.node-btn-select:hover {
   background: var(--surface-3);
   border-color: var(--border-hover);
 }
