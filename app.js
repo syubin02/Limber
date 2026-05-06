@@ -1023,7 +1023,7 @@ function renderGlbObject(container, url) {
   };
 }
 
-const GLTF_LOADER_SCRIPT_URL = 'https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js';
+const GLTF_LOADER_MODULE_URL = 'https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/loaders/GLTFLoader.js?v=20260506';
 let gltfLoaderPromise = null;
 
 async function loadGlbModel(url) {
@@ -1046,10 +1046,10 @@ async function loadGlbModel(url) {
 async function getGltfLoader() {
   if (isConstructor(window.THREE?.GLTFLoader)) return window.THREE.GLTFLoader;
   if (!gltfLoaderPromise) {
-    gltfLoaderPromise = loadScript(GLTF_LOADER_SCRIPT_URL);
+    gltfLoaderPromise = import(GLTF_LOADER_MODULE_URL).then(module => module.GLTFLoader);
   }
-  await gltfLoaderPromise;
-  if (isConstructor(window.THREE?.GLTFLoader)) return window.THREE.GLTFLoader;
+  const Loader = await gltfLoaderPromise;
+  if (isConstructor(Loader)) return Loader;
   throw new Error('GLTFLoader를 초기화하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.');
 }
 
@@ -1061,17 +1061,6 @@ function isConstructor(value) {
   } catch {
     return false;
   }
-}
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = `${src}?v=20260506`;
-    script.async = true;
-    script.onload = resolve;
-    script.onerror = () => reject(new Error('GLTFLoader 스크립트를 불러오지 못했습니다.'));
-    document.head.appendChild(script);
-  });
 }
 
 function normalizeModel(model) {
