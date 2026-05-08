@@ -1425,6 +1425,7 @@ function bindNodeCanvas() {
 
 function applyCanvasTx() {
   nodeCanvas.style.transform = `translate(${canvasTx.x}px,${canvasTx.y}px) scale(${canvasTx.scale})`;
+  requestAnimationFrame(redrawInternalNodeBranches);
 }
 
 function bindNodeToolbar() {
@@ -1467,7 +1468,10 @@ function spawnNode(parentId, x, y, inheritInput) {
   nodeMap.set(id, data);
   renderNodeCard(data);
   updateEmptyState();
-  requestAnimationFrame(redrawConnections);
+  requestAnimationFrame(() => {
+    redrawConnections();
+    redrawInternalNodeBranches();
+  });
   return id;
 }
 
@@ -1520,10 +1524,9 @@ function renderNodeCard(data) {
         <button class="node-add-result" data-add-result="${id}" type="button">+ 결과 분기</button>
       </div>
     </div>
-    <div class="node-link" aria-hidden="true">
-      <span class="node-port node-port-output"></span>
-      <span class="node-link-line"></span>
-      <span class="node-port node-port-input"></span>
+    <div class="node-link" aria-hidden="true" id="nl-${id}">
+      <svg class="node-branch-svg" id="nbs-${id}"></svg>
+      <span class="node-port node-port-output" id="npo-${id}"></span>
     </div>
     <div class="node-results" id="nr-${id}">
       ${results.map(result => renderResultCard(id, result)).join('')}
@@ -1537,6 +1540,7 @@ function renderResultCard(nodeId, result) {
   const key = resultKey(nodeId, result.id);
   return `
     <div class="node-subcard node-result-card" data-result-card="${key}">
+      <span class="node-result-port" data-result-port="${key}" aria-hidden="true"></span>
       <div class="node-header" data-drag="${nodeId}">
         <span class="node-badge" id="nb-${key}">${FORMAT_LABELS[result.format] || result.format}</span>
       </div>
@@ -1609,6 +1613,7 @@ function attachNodeEvents(card, id) {
     if (!dragging) return;
     dragging = false;
     card.classList.remove('is-dragging');
+    redrawInternalNodeBranches();
   });
 
   card.addEventListener('click', e => {
@@ -1726,7 +1731,10 @@ function addNodeResult(id) {
   if (resultsEl) {
     resultsEl.insertAdjacentHTML('beforeend', renderResultCard(id, result));
     updateNodeSelectionUI(resultKey(id, result.id));
-    requestAnimationFrame(redrawConnections);
+    requestAnimationFrame(() => {
+      redrawConnections();
+      redrawInternalNodeBranches();
+    });
   }
 }
 
@@ -1974,6 +1982,40 @@ function redrawConnections() {
       path.setAttribute('d', pathD);
       path.setAttribute('class', nd.kind === 'merge' ? 'conn-path conn-path-merge' : 'conn-path');
       connectionsSvg.appendChild(path);
+    });
+  });
+}
+
+function redrawInternalNodeBranches() {
+  nodeMap.forEach(node => {
+    const card = document.getElementById('nc-' + node.id);
+    const svg = document.getElementById('nbs-' + node.id);
+    const link = document.getElementById('nl-' + node.id);
+    const outPort = document.getElementById('npo-' + node.id);
+    if (!card || !svg || !link || !outPort) return;
+
+    const linkRect = link.getBoundingClientRect();
+    const outRect = outPort.getBoundingClientRect();
+    const resultPorts = [...card.querySelectorAll('[data-result-port]')];
+    svg.setAttribute('viewBox', `0 0 ${Math.max(linkRect.width, 1)} ${Math.max(linkRect.height, 1)}`);
+    svg.innerHTML = '';
+
+    const start = {
+      x: outRect.left + outRect.width / 2 - linkRect.left,
+      y: outRect.top + outRect.height / 2 - linkRect.top,
+    };
+
+    resultPorts.forEach(port => {
+      const portRect = port.getBoundingClientRect();
+      const end = {
+        x: portRect.left + portRect.width / 2 - linkRect.left,
+        y: portRect.top + portRect.height / 2 - linkRect.top,
+      };
+      const dx = Math.max(28, Math.abs(end.x - start.x) * 0.5);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M${start.x},${start.y} C${start.x + dx},${start.y} ${end.x - dx},${end.y} ${end.x},${end.y}`);
+      path.setAttribute('class', 'node-branch-path');
+      svg.appendChild(path);
     });
   });
 }
