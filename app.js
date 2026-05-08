@@ -78,8 +78,9 @@ const CONTROL_LABELS = {
 
 // Node canvas state
 const nodeMap = new Map();
-const selectedNodeIds = new Set();
+const selectedResultKeys = new Set();
 let nodeIdSeq = 0;
+let resultBranchSeq = 0;
 let canvasTx = { x: 0, y: 0, scale: 1 };
 let isPanning = false;
 let panAnchor = { x: 0, y: 0 };
@@ -1448,6 +1449,7 @@ function bindNodeToolbar() {
 // ===== NODE CREATION =====
 function spawnNode(parentId, x, y, inheritInput) {
   const id = 'n' + (++nodeIdSeq);
+  const firstResult = createResultBranch();
   const data = {
     id,
     parentId,
@@ -1459,6 +1461,7 @@ function spawnNode(parentId, x, y, inheritInput) {
     tone:   localStorage.getItem('limber_tone')   || 'neutral',
     lang:   localStorage.getItem('limber_lang')   || 'ko',
     output: '',
+    results: [firstResult],
     kind: 'translate',
   };
   nodeMap.set(id, data);
@@ -1470,8 +1473,31 @@ function spawnNode(parentId, x, y, inheritInput) {
 
 const FORMAT_LABELS = { text: '텍스트 생성', image: '이미지', audio: '음성', video: '동영상', object3d: '3D', space: '공간' };
 
+function createResultBranch(overrides = {}) {
+  return {
+    id: 'r' + (++resultBranchSeq),
+    format: normalizeStoredFormat(overrides.format || localStorage.getItem('limber_format') || 'text'),
+    tone: overrides.tone || localStorage.getItem('limber_tone') || 'neutral',
+    lang: overrides.lang || localStorage.getItem('limber_lang') || 'ko',
+    output: overrides.output || '',
+  };
+}
+
+function ensureNodeResults(data) {
+  if (!Array.isArray(data.results) || !data.results.length) {
+    data.results = [createResultBranch({
+      format: data.format,
+      tone: data.tone,
+      lang: data.lang,
+      output: data.output,
+    })];
+  }
+  return data.results;
+}
+
 function renderNodeCard(data) {
-  const { id, x, y, input, format, tone, lang, output } = data;
+  const { id, x, y, input } = data;
+  const results = ensureNodeResults(data);
 
   const card = document.createElement('div');
   card.className = 'node-card node-pair';
@@ -1491,31 +1517,7 @@ function renderNodeCard(data) {
       <div class="node-body">
         <textarea class="node-textarea" data-ta="${id}" placeholder="텍스트 입력 또는 이미지 드래그" spellcheck="false">${escHtml(input)}</textarea>
         <input type="text" class="node-custom-style" data-cst="${id}" placeholder="말투 직접 입력 (예: 오은영 말투, ISTP 말투)">
-        <div class="node-selects">
-          <select class="node-select" data-sel="${id}" data-field="format">
-            <option value="text"      ${format==='text'     ?'selected':''}>텍스트 생성</option>
-            <option value="image"     ${format==='image'    ?'selected':''}>이미지</option>
-            <option value="audio"     ${format==='audio'    ?'selected':''}>음성</option>
-            <option value="video"     ${format==='video'    ?'selected':''}>동영상</option>
-            <option value="object3d"  ${format==='object3d' ?'selected':''}>3D</option>
-            <option value="space"     ${format==='space'    ?'selected':''}>공간</option>
-          </select>
-          <select class="node-select" data-sel="${id}" data-field="tone">
-            <option value="neutral" ${tone==='neutral'?'selected':''}>중립</option>
-            <option value="formal"  ${tone==='formal' ?'selected':''}>격식체</option>
-            <option value="casual"  ${tone==='casual' ?'selected':''}>구어체</option>
-          </select>
-          <select class="node-select" data-sel="${id}" data-field="lang">
-            <option value="ko" ${lang==='ko'?'selected':''}>KO</option>
-            <option value="en" ${lang==='en'?'selected':''}>EN</option>
-            <option value="ja" ${lang==='ja'?'selected':''}>JA</option>
-            <option value="zh" ${lang==='zh'?'selected':''}>ZH</option>
-            <option value="es" ${lang==='es'?'selected':''}>ES</option>
-          </select>
-        </div>
-        <div class="node-actions">
-          <button class="node-btn node-btn-translate" data-tr="${id}">번역</button>
-        </div>
+        <button class="node-add-result" data-add-result="${id}" type="button">+ 결과 분기</button>
       </div>
     </div>
     <div class="node-link" aria-hidden="true">
@@ -1523,16 +1525,50 @@ function renderNodeCard(data) {
       <span class="node-link-line"></span>
       <span class="node-port node-port-input"></span>
     </div>
-    <div class="node-subcard node-result-card">
-      <div class="node-header" data-drag="${id}">
-        <span class="node-badge" id="nb-${id}">${FORMAT_LABELS[format]}</span>
+    <div class="node-results" id="nr-${id}">
+      ${results.map(result => renderResultCard(id, result)).join('')}
+    </div>`;
+
+  nodeCanvas.appendChild(card);
+  attachNodeEvents(card, id);
+}
+
+function renderResultCard(nodeId, result) {
+  const key = resultKey(nodeId, result.id);
+  return `
+    <div class="node-subcard node-result-card" data-result-card="${key}">
+      <div class="node-header" data-drag="${nodeId}">
+        <span class="node-badge" id="nb-${key}">${FORMAT_LABELS[result.format] || result.format}</span>
       </div>
       <div class="node-body">
-        <div class="node-output ${output ? '' : 'is-empty'}" id="no-${id}">${output ? escHtml(output) : '결과가 여기에 표시됩니다'}</div>
+        <div class="node-selects">
+          <select class="node-select" data-result-sel="${key}" data-field="format">
+            <option value="text"      ${result.format==='text'     ?'selected':''}>텍스트 생성</option>
+            <option value="image"     ${result.format==='image'    ?'selected':''}>이미지</option>
+            <option value="audio"     ${result.format==='audio'    ?'selected':''}>음성</option>
+            <option value="video"     ${result.format==='video'    ?'selected':''}>동영상</option>
+            <option value="object3d"  ${result.format==='object3d' ?'selected':''}>3D</option>
+            <option value="space"     ${result.format==='space'    ?'selected':''}>공간</option>
+          </select>
+          <select class="node-select" data-result-sel="${key}" data-field="tone">
+            <option value="neutral" ${result.tone==='neutral'?'selected':''}>중립</option>
+            <option value="formal"  ${result.tone==='formal' ?'selected':''}>격식체</option>
+            <option value="casual"  ${result.tone==='casual' ?'selected':''}>구어체</option>
+          </select>
+          <select class="node-select" data-result-sel="${key}" data-field="lang">
+            <option value="ko" ${result.lang==='ko'?'selected':''}>KO</option>
+            <option value="en" ${result.lang==='en'?'selected':''}>EN</option>
+            <option value="ja" ${result.lang==='ja'?'selected':''}>JA</option>
+            <option value="zh" ${result.lang==='zh'?'selected':''}>ZH</option>
+            <option value="es" ${result.lang==='es'?'selected':''}>ES</option>
+          </select>
+        </div>
+        <div class="node-output ${result.output ? '' : 'is-empty'}" id="no-${key}">${result.output ? escHtml(result.output) : '결과가 여기에 표시됩니다'}</div>
         <div class="node-actions">
-          <button class="node-btn node-btn-select" data-select-node="${id}">선택</button>
-          <button class="node-btn node-btn-branch" data-br="${id}">Branch +</button>
-          <button class="node-btn node-btn-copy" data-cp="${id}" title="복사">
+          <button class="node-btn node-btn-translate" data-tr-result="${key}">번역</button>
+          <button class="node-btn node-btn-select" data-select-result="${key}">선택</button>
+          <button class="node-btn node-btn-branch" data-br-result="${key}">Branch +</button>
+          <button class="node-btn node-btn-copy" data-cp-result="${key}" title="복사">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <rect x="4" y="4" width="7" height="7" rx="1.2" stroke="currentColor" stroke-width="1.3"/>
               <path d="M8 4V2.5A.5.5 0 007.5 2h-5a.5.5 0 00-.5.5v5a.5.5 0 00.5.5H4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -1541,9 +1577,6 @@ function renderNodeCard(data) {
         </div>
       </div>
     </div>`;
-
-  nodeCanvas.appendChild(card);
-  attachNodeEvents(card, id);
 }
 
 function attachNodeEvents(card, id) {
@@ -1580,23 +1613,44 @@ function attachNodeEvents(card, id) {
 
   card.addEventListener('click', e => {
     if (e.target.closest(`[data-close="${id}"]`)) { deleteNode(id); return; }
-    if (e.target.closest(`[data-tr="${id}"]`))    { runNodeTranslate(id); return; }
-    if (e.target.closest(`[data-br="${id}"]`))    { branchFromNode(id); return; }
-    if (e.target.closest(`[data-select-node="${id}"]`)) { toggleNodeSelection(id); return; }
-    if (e.target.closest(`[data-cp="${id}"]`))    {
-      const d = nodeMap.get(id);
-      if (d && d.output) navigator.clipboard.writeText(d.output).then(() => showToast('복사됨'));
+    const addResult = e.target.closest(`[data-add-result="${id}"]`);
+    if (addResult) { addNodeResult(id); return; }
+    const runResult = e.target.closest('[data-tr-result]');
+    if (runResult) {
+      const parsed = parseResultKey(runResult.dataset.trResult);
+      if (parsed && parsed.nodeId === id) runNodeTranslate(id, parsed.resultId);
+      return;
+    }
+    const branchResult = e.target.closest('[data-br-result]');
+    if (branchResult) {
+      const parsed = parseResultKey(branchResult.dataset.brResult);
+      if (parsed && parsed.nodeId === id) branchFromResult(id, parsed.resultId);
+      return;
+    }
+    const selectResult = e.target.closest('[data-select-result]');
+    if (selectResult) {
+      const parsed = parseResultKey(selectResult.dataset.selectResult);
+      if (parsed && parsed.nodeId === id) toggleResultSelection(id, parsed.resultId);
+      return;
+    }
+    const copyResult = e.target.closest('[data-cp-result]');
+    if (copyResult) {
+      const parsed = parseResultKey(copyResult.dataset.cpResult);
+      const result = parsed && getNodeResult(parsed.nodeId, parsed.resultId);
+      if (result && result.output) navigator.clipboard.writeText(result.output).then(() => showToast('복사됨'));
     }
   });
 
   card.addEventListener('change', e => {
-    const sel = e.target.closest(`[data-sel]`);
+    const sel = e.target.closest('[data-result-sel]');
     if (!sel) return;
-    const d = nodeMap.get(id);
-    if (!d) return;
-    d[sel.dataset.field] = sel.value;
+    const parsed = parseResultKey(sel.dataset.resultSel);
+    if (!parsed || parsed.nodeId !== id) return;
+    const result = getNodeResult(id, parsed.resultId);
+    if (!result) return;
+    result[sel.dataset.field] = sel.value;
     if (sel.dataset.field === 'format') {
-      document.getElementById('nb-' + id).textContent = FORMAT_LABELS[sel.value] || sel.value;
+      document.getElementById('nb-' + sel.dataset.resultSel).textContent = FORMAT_LABELS[sel.value] || sel.value;
     }
   });
 
@@ -1637,14 +1691,56 @@ function attachNodeEvents(card, id) {
 }
 
 // ===== NODE TRANSLATE =====
-async function runNodeTranslate(id) {
+function resultKey(nodeId, resultId) {
+  return `${nodeId}:${resultId}`;
+}
+
+function parseResultKey(key) {
+  const [nodeId, resultId] = String(key || '').split(':');
+  if (!nodeId || !resultId) return null;
+  return { nodeId, resultId };
+}
+
+function getNodeResult(nodeId, resultId) {
+  const node = nodeMap.get(nodeId);
+  if (!node) return null;
+  return ensureNodeResults(node).find(result => result.id === resultId) || null;
+}
+
+function firstNodeResult(node) {
+  return node ? ensureNodeResults(node)[0] : null;
+}
+
+function addNodeResult(id) {
+  const node = nodeMap.get(id);
+  if (!node) return;
+  const results = ensureNodeResults(node);
+  const base = results[results.length - 1];
+  const result = createResultBranch({
+    format: base?.format || node.format,
+    tone: base?.tone || node.tone,
+    lang: base?.lang || node.lang,
+  });
+  results.push(result);
+  const resultsEl = document.getElementById('nr-' + id);
+  if (resultsEl) {
+    resultsEl.insertAdjacentHTML('beforeend', renderResultCard(id, result));
+    updateNodeSelectionUI(resultKey(id, result.id));
+    requestAnimationFrame(redrawConnections);
+  }
+}
+
+async function runNodeTranslate(id, resultId) {
   const d = nodeMap.get(id);
   if (!d) return;
   if (!d.input && !d.image.base64) { showToast('텍스트 또는 이미지를 입력해주세요'); return; }
+  const resultBranch = getNodeResult(id, resultId) || firstNodeResult(d);
+  if (!resultBranch) return;
 
   const card = document.getElementById('nc-' + id);
-  const trBtn = document.querySelector(`[data-tr="${id}"]`);
-  const outEl = document.getElementById('no-' + id);
+  const key = resultKey(id, resultBranch.id);
+  const trBtn = document.querySelector(`[data-tr-result="${key}"]`);
+  const outEl = document.getElementById('no-' + key);
   const cstInput = card ? card.querySelector('[data-cst]') : null;
   if (!trBtn || !outEl) return;
 
@@ -1656,16 +1752,18 @@ async function runNodeTranslate(id) {
   try {
     const result = await callChat({
       text: d.input, imageBase64: d.image.base64, imageType: d.image.type,
-      format: d.format, tone: d.tone, lang: d.lang,
+      format: resultBranch.format, tone: resultBranch.tone, lang: resultBranch.lang,
       customStyle: cstInput ? cstInput.value.trim() : '',
     });
+    resultBranch.output = result;
     d.output = result;
+    d.format = resultBranch.format;
 
-    if (d.format === 'object3d' || d.format === 'space') {
-      const spec = parseSceneSpec(result, d.format);
+    if (resultBranch.format === 'object3d' || resultBranch.format === 'space') {
+      const spec = parseSceneSpec(result, resultBranch.format);
       outEl.textContent = `${spec.title}\n${spec.mood || 'Split 뷰에서 인터랙티브 3D로 확인할 수 있습니다.'}`;
       outEl.className = 'node-output';
-    } else if (d.format === 'image') {
+    } else if (resultBranch.format === 'image') {
       outEl.className = 'node-output';
       outEl.textContent = '이미지 생성 중...';
       const imgRes = await fetch(apiUrl('/api/generate-image'), {
@@ -1681,20 +1779,20 @@ async function runNodeTranslate(id) {
       img.src = url;
       outEl.innerHTML = '';
       outEl.appendChild(img);
-    } else if (d.format === 'audio') {
+    } else if (resultBranch.format === 'audio') {
       outEl.className = 'node-output';
       outEl.textContent = '음성 생성 중...';
       const audioRes = await fetch(apiUrl('/api/generate-audio'), {
         method: 'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ text: result, lang: d.lang }),
+        body: JSON.stringify({ text: result, lang: resultBranch.lang }),
       });
       await assertApiOk(audioRes);
       const blob    = await audioRes.blob();
       const blobUrl = URL.createObjectURL(blob);
       outEl.innerHTML = `<p style="font-size:12px;line-height:1.6;margin-bottom:8px">${escHtml(result)}</p>
         <audio controls preload="auto" style="width:100%;height:32px;border-radius:6px;accent-color:var(--primary)" src="${blobUrl}"></audio>`;
-    } else if (d.format === 'video') {
+    } else if (resultBranch.format === 'video') {
       outEl.className   = 'node-output';
       outEl.textContent = '동영상 생성 중... (2–5분 소요)';
       const startRes = await fetch(apiUrl('/api/generate-video'), {
@@ -1742,59 +1840,74 @@ async function runNodeTranslate(id) {
 function branchFromNode(parentId) {
   const parent = nodeMap.get(parentId);
   if (!parent) return;
-  const sibCount = [...nodeMap.values()].filter(n => n.parentId === parentId).length;
-  spawnNode(parentId, parent.x + 780, parent.y + sibCount * 220, parent.output || '');
+  const result = firstNodeResult(parent);
+  branchFromResult(parentId, result?.id);
 }
 
-function toggleNodeSelection(id) {
-  const node = nodeMap.get(id);
-  if (!node) return;
-  if (!node.output) {
-    showToast('결과가 있는 노드만 선택할 수 있습니다.');
+function branchFromResult(parentId, resultId) {
+  const parent = nodeMap.get(parentId);
+  const result = resultId ? getNodeResult(parentId, resultId) : firstNodeResult(parent);
+  if (!parent || !result) return;
+  const sibCount = [...nodeMap.values()].filter(n => n.parentId === parentId).length;
+  spawnNode(parentId, parent.x + 780, parent.y + sibCount * 220, result.output || '');
+}
+
+function toggleResultSelection(nodeId, resultId) {
+  const key = resultKey(nodeId, resultId);
+  const result = getNodeResult(nodeId, resultId);
+  if (!result || !result.output) {
+    showToast('결과가 있는 카드만 선택할 수 있습니다.');
     return;
   }
-  if (selectedNodeIds.has(id)) {
-    selectedNodeIds.delete(id);
+  if (selectedResultKeys.has(key)) {
+    selectedResultKeys.delete(key);
   } else {
-    selectedNodeIds.add(id);
+    selectedResultKeys.add(key);
   }
-  updateNodeSelectionUI(id);
+  updateNodeSelectionUI(key);
   updateMergeToolbar();
 }
 
-function updateNodeSelectionUI(id) {
-  const card = document.getElementById('nc-' + id);
-  const btn = card ? card.querySelector(`[data-select-node="${id}"]`) : null;
-  const selected = selectedNodeIds.has(id);
+function updateNodeSelectionUI(key) {
+  const parsed = parseResultKey(key);
+  const card = parsed ? document.querySelector(`[data-result-card="${key}"]`) : null;
+  const btn = card ? card.querySelector(`[data-select-result="${key}"]`) : null;
+  const selected = selectedResultKeys.has(key);
   if (card) card.classList.toggle('is-selected', selected);
   if (btn) btn.textContent = selected ? '선택됨' : '선택';
 }
 
 function updateMergeToolbar() {
   if (!mergeNodesBtn) return;
-  const count = selectedNodeIds.size;
+  const count = selectedResultKeys.size;
   mergeNodesBtn.disabled = count < 2;
   if (mergeNodesLabel) mergeNodesLabel.textContent = count ? `선택 합치기 (${count})` : '선택 합치기';
 }
 
 function mergeSelectedNodes() {
-  const selected = [...selectedNodeIds]
-    .map(id => nodeMap.get(id))
-    .filter(node => node && node.output);
+  const selected = [...selectedResultKeys]
+    .map(key => {
+      const parsed = parseResultKey(key);
+      if (!parsed) return null;
+      const node = nodeMap.get(parsed.nodeId);
+      const result = getNodeResult(parsed.nodeId, parsed.resultId);
+      return node && result && result.output ? { key, node, result } : null;
+    })
+    .filter(Boolean);
   if (selected.length < 2) {
-    showToast('합칠 결과 노드를 2개 이상 선택해주세요.');
+    showToast('합칠 결과 카드를 2개 이상 선택해주세요.');
     return;
   }
 
-  const minX = Math.min(...selected.map(node => node.x));
-  const avgY = selected.reduce((sum, node) => sum + node.y, 0) / selected.length;
-  const maxX = Math.max(...selected.map(node => node.x));
+  const minX = Math.min(...selected.map(item => item.node.x));
+  const avgY = selected.reduce((sum, item) => sum + item.node.y, 0) / selected.length;
+  const maxX = Math.max(...selected.map(item => item.node.x));
   const input = buildMergedInput(selected);
   const id = spawnNode(null, maxX + 820, avgY, input);
   const merged = nodeMap.get(id);
   if (merged) {
-    merged.parentId = selected[0].id;
-    merged.parentIds = selected.map(node => node.id);
+    merged.parentId = selected[0].node.id;
+    merged.parentIds = [...new Set(selected.map(item => item.node.id))];
     merged.kind = 'merge';
     merged.format = 'text';
     merged.x = Math.max(maxX + 820, minX + 820);
@@ -1803,22 +1916,23 @@ function mergeSelectedNodes() {
     if (card) {
       card.style.left = merged.x + 'px';
       card.style.top = merged.y + 'px';
-      const badge = card.querySelector('#nb-' + id);
+      const badge = card.querySelector('.node-badge');
       if (badge) badge.textContent = 'Merge';
     }
   }
 
-  selectedNodeIds.clear();
-  selected.forEach(node => updateNodeSelectionUI(node.id));
+  const previousKeys = [...selectedResultKeys];
+  selectedResultKeys.clear();
+  previousKeys.forEach(updateNodeSelectionUI);
   updateMergeToolbar();
   redrawConnections();
   showToast('선택한 결과를 새 Merge 노드로 합쳤습니다.');
 }
 
-function buildMergedInput(nodes) {
-  const parts = nodes.map((node, index) => {
-    const label = FORMAT_LABELS[node.format] || node.format || '결과';
-    return `[${index + 1}. ${label}]\n${node.output}`;
+function buildMergedInput(items) {
+  const parts = items.map((item, index) => {
+    const label = FORMAT_LABELS[item.result.format] || item.result.format || '결과';
+    return `[${index + 1}. ${label}]\n${item.result.output}`;
   });
   return `아래 결과들을 하나의 새 작업으로 합쳐줘.\n\n${parts.join('\n\n')}\n\n합성 목표:\n- 서로 다른 결과의 핵심 요소를 유지해.\n- 공간과 3D가 있으면 같은 장면 안에 배치해.\n- 이미지와 음악/음성이 있으면 분위기와 타이밍이 어울리게 결합해.`;
 }
@@ -1830,7 +1944,9 @@ function deleteNode(id) {
   [...nodeMap.values()]
     .filter(n => n.parentId === id || (Array.isArray(n.parentIds) && n.parentIds.includes(id)))
     .forEach(n => deleteNode(n.id));
-  selectedNodeIds.delete(id);
+  [...selectedResultKeys]
+    .filter(key => key.startsWith(id + ':'))
+    .forEach(key => selectedResultKeys.delete(key));
   nodeMap.delete(id);
   updateMergeToolbar();
   updateEmptyState();

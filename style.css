@@ -1227,9 +1227,15 @@ audio#audio-player {
   box-shadow: var(--shadow), 0 0 0 1px rgba(255, 97, 0, 0.12);
 }
 
-.node-card.is-selected .node-result-card {
+.node-result-card.is-selected {
   border-color: rgba(116, 151, 190, 0.72);
   box-shadow: var(--shadow), 0 0 0 2px rgba(116, 151, 190, 0.28);
+}
+
+.node-results {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .node-input-card {
@@ -1398,6 +1404,23 @@ audio#audio-player {
 .node-custom-style::placeholder { color: var(--text-muted); }
 .node-custom-style:focus { border-color: rgba(255, 97, 0, 0.5); }
 
+.node-add-result {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px dashed rgba(116, 151, 190, 0.32);
+  border-radius: 6px;
+  background: rgba(116, 151, 190, 0.08);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  transition: border-color 150ms var(--ease), background 150ms var(--ease);
+}
+
+.node-add-result:hover {
+  border-color: rgba(116, 151, 190, 0.58);
+  background: rgba(116, 151, 190, 0.14);
+}
+
 .node-select {
   flex: 1;
   min-width: 0;
@@ -1462,7 +1485,7 @@ audio#audio-player {
   color: var(--text);
 }
 
-.node-card.is-selected .node-btn-select {
+.node-result-card.is-selected .node-btn-select {
   color: #fff;
   background: rgba(116, 151, 190, 0.52);
   border-color: rgba(116, 151, 190, 0.72);
